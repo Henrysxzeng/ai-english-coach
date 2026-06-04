@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(pip *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(uvicorn *)",
+      "Bash(python *)",
+      "Bash(pytest *)",
+      "Bash(node *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(cat *)",
+      "Read",
+      "Write",
+      "Edit"
+    ],
+    "defaultMode": "acceptEdits"
+  }
+}

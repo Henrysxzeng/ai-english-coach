@@ -1,4 +1,5 @@
-﻿import aiosqlite
+﻿# models/db.py | backend | v1.0
+import aiosqlite
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -26,6 +27,7 @@ async def init_db():
                 session_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                audio_path TEXT,
                 turn_id INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES sessions(id)

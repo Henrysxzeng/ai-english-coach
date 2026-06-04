@@ -1,4 +1,5 @@
-﻿import os
+﻿# routers/session.py | backend | v1.0
+import os
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException

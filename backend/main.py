@@ -1,4 +1,5 @@
-﻿from contextlib import asynccontextmanager
+﻿# main.py | backend | v1.0
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from models.db import init_db

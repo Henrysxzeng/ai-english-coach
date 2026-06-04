@@ -1,4 +1,5 @@
-﻿from pydantic import BaseModel
+﻿# schemas/api_schemas.py | backend | v1.0
+from pydantic import BaseModel
 from typing import Optional, List
 
 
@@ -58,5 +59,6 @@ class WSResponse(BaseModel):
     type: str
     user_text: str
     ai_text: str
+    audio_base64: str
     correction: WSCorrectionDetail
     turn_id: int

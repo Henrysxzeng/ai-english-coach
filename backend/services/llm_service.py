@@ -1,4 +1,6 @@
-﻿import os
+﻿# services/llm_service.py | backend | v1.0
+from __future__ import annotations
+import os
 import json
 import asyncio
 from openai import AsyncOpenAI

@@ -1,11 +1,14 @@
-﻿import os
-import json
+# routers/ws.py | backend | v1.0
+import os
+import base64
 import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import aiosqlite
 from dotenv import load_dotenv
+from services.asr_service import transcribe_audio
 from services.llm_service import get_ai_response, evaluate_correction
+from services.tts_service import text_to_speech
 
 load_dotenv()
 
@@ -32,23 +35,19 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
     try:
         while True:
-            raw = await websocket.receive_text()
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
-                continue
-
-            if msg.get("type") != "user_message":
-                continue
-
-            user_text = (msg.get("text") or "").strip()
-            if not user_text:
-                continue
+            # Receive binary audio (WAV, 16kHz, mono)
+            audio_bytes = await websocket.receive_bytes()
 
             now = datetime.now(timezone.utc).isoformat()
 
-            # Load history
+            # ASR: audio bytes → text
+            try:
+                user_text = await transcribe_audio(audio_bytes)
+            except ValueError as e:
+                await websocket.send_json({"type": "error", "message": str(e)})
+                continue
+
+            # Load message history for LLM context
             async with aiosqlite.connect(DB_PATH) as db:
                 db.row_factory = aiosqlite.Row
                 cursor = await db.execute(
@@ -59,13 +58,21 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             messages = history + [{"role": "user", "content": user_text}]
 
-            # Parallel: correction + AI response
+            # Parallel: grammar correction + AI reply
             correction, ai_text = await asyncio.gather(
                 evaluate_correction(user_text),
                 get_ai_response(scene, messages),
             )
 
-            # Persist
+            # TTS: AI text → audio bytes → base64
+            try:
+                tts_bytes = await text_to_speech(ai_text)
+                audio_base64 = base64.b64encode(tts_bytes).decode("utf-8")
+            except ValueError as e:
+                await websocket.send_json({"type": "error", "message": str(e)})
+                continue
+
+            # Persist messages and corrections
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute(
                     "INSERT INTO messages (session_id, role, content, turn_id, created_at) VALUES (?, 'user', ?, ?, ?)",
@@ -77,8 +84,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 )
                 if correction.get("has_error"):
                     await db.execute(
-                        "INSERT INTO corrections (session_id, turn_id, original, corrected, explanation, error_type) VALUES (?, ?, ?, ?, ?, ?)",
-                        (session_id, turn_id, correction["original"], correction["corrected"], correction["explanation"], correction.get("error_type", "grammar")),
+                        "INSERT INTO corrections (session_id, turn_id, original, corrected, explanation, error_type) "
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                        (
+                            session_id,
+                            turn_id,
+                            correction["original"],
+                            correction["corrected"],
+                            correction["explanation"],
+                            correction.get("error_type", "grammar"),
+                        ),
                     )
                 await db.commit()
 
@@ -86,6 +101,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 "type": "response",
                 "user_text": user_text,
                 "ai_text": ai_text,
+                "audio_base64": audio_base64,
                 "correction": correction,
                 "turn_id": turn_id,
             })

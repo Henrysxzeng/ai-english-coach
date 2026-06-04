@@ -17,6 +17,6 @@
       "Write",
       "Edit"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "bypassPermissions"
   }
 }

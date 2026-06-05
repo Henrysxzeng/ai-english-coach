@@ -4,6 +4,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -109,9 +110,14 @@ export default function HomePage() {
         ))}
       </div>
 
-      <p className="mt-12 text-gray-400 text-xs">
-        Powered by Claude AI · OpenAI Whisper · Web Speech API
-      </p>
+      <div className="mt-10 flex flex-col items-center gap-3">
+        <Link href="/history" className="text-indigo-400 hover:text-indigo-600 text-xs underline">
+          View Progress History →
+        </Link>
+        <p className="text-gray-400 text-xs">
+          Powered by Claude AI · OpenAI Whisper · Web Speech API
+        </p>
+      </div>
     </main>
   )
 }

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import aiosqlite
 from dotenv import load_dotenv
-from services.llm_service import get_ai_response, evaluate_correction
+from services.llm_service import get_ai_response, evaluate_correction, generate_memory_greeting
 
 load_dotenv()
 
@@ -36,6 +36,46 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
     scene = session["scene"]
     turn_id = 1
+
+    # Query previous analysis for memory-aware greeting
+    prev_row = None
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                """SELECT topic, weak_areas, ambiguous_expressions, clarity_score, structure_score
+                FROM session_analyses
+                WHERE scene = ? AND session_id != ?
+                ORDER BY created_at DESC LIMIT 1""",
+                (scene, session_id),
+            )
+            prev_row = await cursor.fetchone()
+    except Exception:
+        pass
+
+    if prev_row and json.loads(prev_row["weak_areas"] or "[]"):
+        previous_analysis = {
+            "topic": prev_row["topic"],
+            "weak_areas": json.loads(prev_row["weak_areas"] or "[]"),
+            "ambiguous_expressions": json.loads(prev_row["ambiguous_expressions"] or "[]"),
+            "clarity_score": prev_row["clarity_score"],
+            "structure_score": prev_row["structure_score"],
+        }
+        try:
+            greeting = await generate_memory_greeting(scene, previous_analysis)
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute(
+                    "UPDATE messages SET content = ? WHERE session_id = ? AND role = 'assistant' AND turn_id = 0",
+                    (greeting, session_id),
+                )
+                await db.commit()
+            await websocket.send_json({
+                "type": "greeting",
+                "ai_text": greeting,
+                "has_memory": True,
+            })
+        except Exception:
+            pass  # 生成失败则静默，用默认开场白
 
     try:
         while True:

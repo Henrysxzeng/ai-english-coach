@@ -1,6 +1,6 @@
 ﻿# schemas/api_schemas.py | backend | v1.0
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 class SessionCreate(BaseModel):
@@ -12,6 +12,7 @@ class SessionResponse(BaseModel):
     scene: str
     system_prompt: str
     created_at: str
+    previous_analysis: Optional[Any] = None
 
 
 class MessageResponse(BaseModel):

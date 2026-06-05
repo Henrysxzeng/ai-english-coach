@@ -45,4 +45,21 @@ async def init_db():
                 FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS session_analyses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL UNIQUE,
+                scene TEXT NOT NULL,
+                topic TEXT,
+                clarity_score REAL DEFAULT 0,
+                structure_score REAL DEFAULT 0,
+                ambiguous_expressions TEXT DEFAULT '[]',
+                weak_areas TEXT DEFAULT '[]',
+                overall_score REAL DEFAULT 0,
+                grammar_errors INTEGER DEFAULT 0,
+                vocabulary_score REAL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            )
+        """)
         await db.commit()

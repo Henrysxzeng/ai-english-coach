@@ -1,5 +1,6 @@
-﻿# routers/session.py | backend | v1.0
+﻿# routers/session.py | backend | v1.1
 import os
+import json
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
@@ -28,6 +29,7 @@ async def create_session(data: SessionCreate):
     now = datetime.now(timezone.utc).isoformat()
     opener = SCENE_OPENERS[data.scene]
 
+    previous_analysis = None
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "INSERT INTO sessions (id, scene, status, created_at) VALUES (?, ?, 'active', ?)",
@@ -39,7 +41,31 @@ async def create_session(data: SessionCreate):
         )
         await db.commit()
 
-    return SessionResponse(session_id=session_id, scene=data.scene, system_prompt=opener, created_at=now)
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("""
+            SELECT topic, weak_areas, ambiguous_expressions, clarity_score, structure_score, created_at
+            FROM session_analyses
+            WHERE scene = ?
+            ORDER BY created_at DESC LIMIT 1
+        """, (data.scene,))
+        prev = await cursor.fetchone()
+        if prev:
+            previous_analysis = {
+                "topic": prev["topic"],
+                "weak_areas": json.loads(prev["weak_areas"] or "[]"),
+                "ambiguous_expressions": json.loads(prev["ambiguous_expressions"] or "[]"),
+                "clarity_score": prev["clarity_score"],
+                "structure_score": prev["structure_score"],
+                "session_date": prev["created_at"],
+            }
+
+    return SessionResponse(
+        session_id=session_id,
+        scene=data.scene,
+        system_prompt=opener,
+        created_at=now,
+        previous_analysis=previous_analysis,
+    )
 
 
 @router.get("/{session_id}")

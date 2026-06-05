@@ -1,5 +1,6 @@
-﻿# routers/report.py | backend | v1.0
+﻿# routers/report.py | backend | v1.1
 import os
+import json
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 import aiosqlite
@@ -62,6 +63,28 @@ async def get_report(session_id: str):
         }
 
     scores = await generate_report_scores(session_id, messages, corrections_raw)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO session_analyses
+            (session_id, scene, topic, clarity_score, structure_score,
+             ambiguous_expressions, weak_areas, overall_score, grammar_errors,
+             vocabulary_score, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            session_id,
+            session["scene"],
+            scores.get("topic", ""),
+            scores.get("clarity_score", 0),
+            scores.get("structure_score", 0),
+            json.dumps(scores.get("ambiguous_expressions", []), ensure_ascii=False),
+            json.dumps(scores.get("weak_areas", []), ensure_ascii=False),
+            scores.get("overall_score", 0),
+            scores.get("grammar_errors", 0),
+            scores.get("vocabulary_score", 0),
+            datetime.utcnow().isoformat(),
+        ))
+        await db.commit()
 
     return {
         "session_id": session_id,

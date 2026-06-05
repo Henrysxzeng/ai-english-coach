@@ -29,7 +29,7 @@ async def get_history():
 @router.get("/{scene}")
 async def get_history_by_scene(scene: str):
     """返回指定场景的历史记录。"""
-    valid = {"interview", "restaurant", "meeting"}
+    valid = {"interview", "restaurant", "meeting", "hospital", "phone_call", "customer_service"}
     if scene not in valid:
         raise HTTPException(status_code=400, detail="Invalid scene")
     async with aiosqlite.connect(DB_PATH) as db:

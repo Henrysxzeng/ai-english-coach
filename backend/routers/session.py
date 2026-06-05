@@ -17,13 +17,19 @@ SCENE_OPENERS = {
     "interview": "Hello! Welcome, please take a seat. To start, could you tell me a little about yourself and why you are interested in this position?",
     "restaurant": "Hi there, welcome to The Golden Fork! I will be your server today. Can I start you off with something to drink, or are you ready to order?",
     "meeting": "Good morning everyone, let us get started. Could you give me a quick status update on where things stand with the project this week?",
+    "hospital": "Good morning! I'm Dr. Smith. Please take a seat. What brings you in today? Could you describe your main symptoms?",
+    "phone_call": "Hello! Thank you for calling. How can I help you today?",
+    "customer_service": "Thank you for calling customer support. My name is Alex. How can I assist you today?",
+    "assessment": "Welcome to the speaking assessment! I'll ask you a few questions to understand your English level. Let's start: could you please tell me a bit about yourself and your English learning journey?",
 }
+
+VALID_SCENES = set(SCENE_OPENERS.keys())
 
 
 @router.post("/create", response_model=SessionResponse)
 async def create_session(data: SessionCreate):
-    if data.scene not in SCENE_OPENERS:
-        raise HTTPException(status_code=400, detail=f"Invalid scene. Choose: {list(SCENE_OPENERS.keys())}")
+    if data.scene not in VALID_SCENES:
+        raise HTTPException(status_code=400, detail=f"Invalid scene. Choose: {sorted(VALID_SCENES)}")
 
     session_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()

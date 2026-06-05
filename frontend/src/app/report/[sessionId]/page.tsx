@@ -45,7 +45,6 @@ interface Report {
   filler_count?: number
   filler_words?: string[]
   key_vocabulary?: Array<{ word: string; definition: string; example: string }>
-  scene?: string
   interview_feedback?: {
     communication_score: number
     star_coverage: {

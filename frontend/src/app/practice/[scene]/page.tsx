@@ -46,10 +46,14 @@ function PracticeContent({ scene }: { scene: string }) {
   const [isEnding, setIsEnding] = useState(false)
   const [hasMemory, setHasMemory] = useState(false)
   const [memoryGreeting, setMemoryGreeting] = useState('')
+  const [recordingMode, setRecordingMode] = useState<'auto' | 'manual'>('auto')
+  const [pendingText, setPendingText] = useState('')
+  const [difficulty, setDifficulty] = useState<string>('')
 
   const wsRef = useRef<WebSocket | null>(null)
   const recognitionRef = useRef<any>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const recordingStartRef = useRef<number>(0)
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -80,6 +84,7 @@ function PracticeContent({ scene }: { scene: string }) {
           text: m.content ?? m.text ?? '',
         }))
         if (initialMsgs.length > 0) setMessages(initialMsgs)
+        if (data.difficulty) setDifficulty(data.difficulty)
       })
       .catch(() => {})
 
@@ -169,6 +174,21 @@ function PracticeContent({ scene }: { scene: string }) {
     }
   }, [sessionId])
 
+  const sendMessage = useCallback((text: string) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) {
+      setStatusText('WebSocket not connected')
+      return
+    }
+    wsRef.current.send(JSON.stringify({
+      type: 'user_message',
+      text,
+      duration_ms: Date.now() - recordingStartRef.current,
+    }))
+    setIsWaiting(true)
+    setPendingText('')
+    setStatusText('Waiting for AI...')
+  }, [])
+
   // Toggle mic — starts/stops SpeechRecognition
   const handleMicClick = useCallback(() => {
     if (isListening) {
@@ -196,6 +216,7 @@ function PracticeContent({ scene }: { scene: string }) {
 
     recognition.onstart = () => {
       accumulatedText = ''
+      recordingStartRef.current = Date.now()
       setIsListening(true)
       setStatusText('Listening… (click to stop)')
     }
@@ -209,13 +230,12 @@ function PracticeContent({ scene }: { scene: string }) {
         setStatusText('Please speak in English 🇬🇧')
         return
       }
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'user_message', text }))
-        setIsWaiting(true)
-        setStatusText('Waiting for AI...')
-      } else {
-        setStatusText('WebSocket not connected')
+      if (recordingMode === 'manual') {
+        setPendingText(text)
+        setStatusText('Review your message, then click Send ✉️')
+        return
       }
+      sendMessage(text)
     }
     recognition.onerror = (e: any) => {
       setIsListening(false)
@@ -238,7 +258,7 @@ function PracticeContent({ scene }: { scene: string }) {
     } catch {
       setStatusText('Could not start recognition')
     }
-  }, [isListening])
+  }, [isListening, recordingMode, sendMessage])
 
   const handleEndPractice = async () => {
     if (isEnding) return
@@ -272,6 +292,17 @@ function PracticeContent({ scene }: { scene: string }) {
           <h1 className="text-lg font-bold text-gray-900">
             {SCENE_LABELS[scene] ?? scene}
           </h1>
+          {difficulty && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              difficulty === 'easy'
+                ? 'bg-green-100 text-green-600'
+                : difficulty === 'hard'
+                ? 'bg-red-100 text-red-600'
+                : 'bg-yellow-100 text-yellow-600'
+            }`}>
+              {difficulty === 'easy' ? 'Beginner' : difficulty === 'hard' ? 'Advanced' : 'Intermediate'}
+            </span>
+          )}
           <div className="flex items-center gap-1.5">
             <div
               className={`w-2 h-2 rounded-full ${
@@ -363,23 +394,85 @@ function PracticeContent({ scene }: { scene: string }) {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Mic button */}
+          {/* Mic button area */}
           <div className="border-t bg-white p-5 flex flex-col items-center gap-2">
-            <button
-              onClick={handleMicClick}
-              disabled={wsStatus !== 'connected' || isSpeaking || isWaiting}
-              aria-label={isListening ? 'Stop recording' : 'Start recording'}
-              className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-150 shadow-md focus:outline-none focus:ring-4 focus:ring-offset-2 ${
-                isListening
-                  ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 scale-110 animate-pulse'
-                  : wsStatus !== 'connected' || isSpeaking || isWaiting
-                  ? 'bg-gray-300 cursor-not-allowed'
-                  : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300 hover:scale-105'
-              }`}
-            >
-              🎤
-            </button>
+            {/* Recording mode toggle */}
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <button
+                onClick={() => setRecordingMode('auto')}
+                className={`px-2 py-1 rounded ${recordingMode === 'auto' ? 'bg-indigo-100 text-indigo-600 font-semibold' : 'hover:bg-gray-100'}`}
+              >
+                Auto
+              </button>
+              <span>/</span>
+              <button
+                onClick={() => setRecordingMode('manual')}
+                className={`px-2 py-1 rounded ${recordingMode === 'manual' ? 'bg-indigo-100 text-indigo-600 font-semibold' : 'hover:bg-gray-100'}`}
+              >
+                Manual
+              </button>
+            </div>
+
+            {/* Mic button with sound-wave rings */}
+            <div className="relative flex items-center justify-center">
+              {isListening && (
+                <>
+                  <span className="absolute w-16 h-16 rounded-full bg-red-400 opacity-40 animate-ping" />
+                  <span className="absolute w-20 h-20 rounded-full bg-red-300 opacity-20 animate-ping" style={{ animationDelay: '0.3s' }} />
+                </>
+              )}
+              <button
+                onClick={handleMicClick}
+                disabled={wsStatus !== 'connected' || isSpeaking || isWaiting}
+                aria-label={isListening ? 'Stop recording' : 'Start recording'}
+                className={`relative w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-150 shadow-md focus:outline-none focus:ring-4 focus:ring-offset-2 ${
+                  isListening
+                    ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 scale-110'
+                    : wsStatus !== 'connected' || isSpeaking || isWaiting
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300 hover:scale-105'
+                }`}
+              >
+                🎤
+              </button>
+            </div>
+
+            {/* Pending message + Send button (manual mode) */}
+            {pendingText && recordingMode === 'manual' && (
+              <div className="flex items-center gap-2 max-w-xs w-full mt-1">
+                <p className="text-xs text-gray-600 flex-1 truncate bg-gray-50 rounded-lg px-3 py-1.5 border">
+                  {pendingText}
+                </p>
+                <button
+                  onClick={() => sendMessage(pendingText)}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg whitespace-nowrap"
+                >
+                  Send ✉️
+                </button>
+              </div>
+            )}
+
             <p className="text-xs text-gray-400 text-center">{statusText}</p>
+
+            {/* Hint button */}
+            {wsStatus === 'connected' && !isListening && !isWaiting && (
+              <button
+                onClick={() => {
+                  if (wsRef.current?.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({
+                      type: 'user_message',
+                      text: "[HINT REQUEST] I'm not sure what to say next. Please give me a simple hint or a starter phrase I can use.",
+                      duration_ms: 0,
+                    }))
+                    setIsWaiting(true)
+                    setStatusText('Getting hint...')
+                  }
+                }}
+                className="text-xs text-indigo-400 hover:text-indigo-600 underline mt-1"
+              >
+                💡 Need a hint?
+              </button>
+            )}
           </div>
         </div>
 

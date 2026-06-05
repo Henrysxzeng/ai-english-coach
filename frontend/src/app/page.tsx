@@ -1,6 +1,5 @@
-// file: src/app/page.tsx — TASK-012
+// file: src/app/page.tsx — TASK-012/018/021/023
 // owner: Frontend Engineer
-// version: 1.0
 'use client'
 
 import { useState } from 'react'
@@ -31,12 +30,61 @@ const SCENES = [
     subtitle: '商务会议',
     description: 'Discuss project updates and share ideas in a team meeting.',
   },
+  {
+    id: 'hospital',
+    icon: '🏥',
+    title: 'Hospital Visit',
+    subtitle: '医院就诊',
+    description: 'Talk to a doctor about your symptoms and treatment options.',
+  },
+  {
+    id: 'phone_call',
+    icon: '📞',
+    title: 'Phone Call',
+    subtitle: '电话沟通',
+    description: 'Handle a business or personal call with confidence.',
+  },
+  {
+    id: 'customer_service',
+    icon: '🎧',
+    title: 'Customer Service',
+    subtitle: '客户服务',
+    description: 'Resolve complaints or answer questions professionally.',
+  },
+]
+
+const HOW_TO_USE = [
+  {
+    step: 1,
+    icon: '🎭',
+    title: 'Choose a Scene',
+    description: 'Pick a real-life practice scenario',
+  },
+  {
+    step: 2,
+    icon: '🎤',
+    title: 'Start Speaking',
+    description: 'Click the mic and speak in English',
+  },
+  {
+    step: 3,
+    icon: '🤖',
+    title: 'Get Instant Feedback',
+    description: 'AI replies and corrects grammar in real-time',
+  },
+  {
+    step: 4,
+    icon: '📊',
+    title: 'Review Your Report',
+    description: 'See your score and improvement tips after practice',
+  },
 ]
 
 export default function HomePage() {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
 
   async function handleSceneClick(sceneId: string) {
     if (loading) return
@@ -48,7 +96,7 @@ export default function HomePage() {
       const res = await fetch(`${API_URL}/api/session/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scene: sceneId }),
+        body: JSON.stringify({ scene: sceneId, difficulty }),
         signal: controller.signal,
       })
       clearTimeout(timeoutId)
@@ -69,27 +117,57 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col items-center justify-center p-8">
-      <div className="text-center mb-12">
+    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col items-center p-8">
+      {/* ── Hero ─────────────────────────────────────── */}
+      <div className="text-center mt-10 mb-8 max-w-xl">
         <div className="inline-flex items-center gap-2 bg-indigo-100 rounded-full px-4 py-1.5 mb-5">
           <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
           <span className="text-indigo-600 text-sm font-medium">AI-Powered Speaking Coach</span>
         </div>
         <h1 className="text-5xl font-bold text-gray-900 mb-3 tracking-tight">
-          AI English Coach
+          Master English Speaking
         </h1>
-        <p className="text-lg text-gray-500 max-w-sm mx-auto">
-          Select a scenario and start a real conversation with AI
+        <p className="text-lg text-gray-500 max-w-md mx-auto">
+          Practice real conversations with AI. Get instant grammar feedback.
         </p>
       </div>
 
+      {/* ── Assessment banner ───────────────────────── */}
+      <div className="text-center my-4">
+        <Link
+          href="/assessment"
+          className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-xl transition-colors"
+        >
+          📊 Not sure your level? Take a 5-minute speaking test →
+        </Link>
+      </div>
+
+      {/* ── Difficulty selector ──────────────────────── */}
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <p className="text-sm text-gray-500 font-medium">Difficulty:</p>
+        {(['easy', 'medium', 'hard'] as const).map((d) => (
+          <button
+            key={d}
+            onClick={() => setDifficulty(d)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${
+              difficulty === d
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}
+          >
+            {d === 'easy' ? '🟢 Beginner' : d === 'medium' ? '🟡 Intermediate' : '🔴 Advanced'}
+          </button>
+        ))}
+      </div>
+
       {error && (
-        <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm max-w-md">
+        <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm max-w-md w-full">
           ⚠️ {error} — make sure the backend server is running at {API_URL}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl w-full">
+      {/* ── Scene cards ──────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl w-full mb-12">
         {SCENES.map((scene) => (
           <button
             key={scene.id}
@@ -110,7 +188,25 @@ export default function HomePage() {
         ))}
       </div>
 
-      <div className="mt-10 flex flex-col items-center gap-3">
+      {/* ── How to Use ───────────────────────────────── */}
+      <div className="max-w-3xl w-full mb-12">
+        <h2 className="text-xl font-bold text-gray-800 text-center mb-6">How to Use</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {HOW_TO_USE.map(({ step, icon, title, description }) => (
+            <div key={step} className="bg-white rounded-2xl p-5 shadow-sm text-center">
+              <div className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm font-bold mx-auto mb-3">
+                {step}
+              </div>
+              <div className="text-3xl mb-2">{icon}</div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-1">{title}</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">{description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Footer ───────────────────────────────────── */}
+      <div className="flex flex-col items-center gap-3 pb-8">
         <Link href="/history" className="text-indigo-400 hover:text-indigo-600 text-xs underline">
           View Progress History →
         </Link>

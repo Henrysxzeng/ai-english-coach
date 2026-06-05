@@ -39,6 +39,12 @@ interface Report {
   structure_score?: number
   ambiguous_expressions?: AmbiguousExpression[]
   weak_areas?: string[]
+  wpm?: number | null
+  wpm_label?: string | null
+  wpm_context?: string
+  filler_count?: number
+  filler_words?: string[]
+  key_vocabulary?: Array<{ word: string; definition: string; example: string }>
 }
 
 // ─── SVG ring progress bar ─────────────────────────────────────────────────────
@@ -243,7 +249,38 @@ export default function ReportPage() {
           )}
         </div>
 
-        {/* 4. Ambiguous expressions */}
+        {/* 4. Fluency analysis */}
+        {report.wpm != null && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="font-semibold text-gray-800 mb-3">🎙️ Fluency Analysis</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Speaking Speed</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {report.wpm}{' '}
+                  <span className="text-sm font-normal text-gray-400">WPM</span>
+                </p>
+                {report.wpm_label && (
+                  <p className="text-sm text-indigo-600 font-medium mt-0.5">{report.wpm_label}</p>
+                )}
+                {report.wpm_context && (
+                  <p className="text-xs text-gray-400 mt-1">{report.wpm_context}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Filler Words</p>
+                <p className="text-2xl font-bold text-gray-800">{report.filler_count ?? 0}</p>
+                {report.filler_words && report.filler_words.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Detected: {report.filler_words.join(', ')}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 5. Ambiguous expressions */}
         {report.ambiguous_expressions && report.ambiguous_expressions.length > 0 && (
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h2 className="font-semibold text-gray-800 mb-4">💬 Clearer Ways to Say It</h2>
@@ -277,7 +314,23 @@ export default function ReportPage() {
           </div>
         )}
 
-        {/* 7. Highlights */}
+        {/* 7. Key vocabulary */}
+        {report.key_vocabulary && report.key_vocabulary.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="font-semibold text-gray-800 mb-4">📚 Key Vocabulary</h2>
+            <div className="space-y-3">
+              {report.key_vocabulary.map((item, i) => (
+                <div key={i} className="border border-gray-100 rounded-xl p-4">
+                  <p className="font-semibold text-gray-800 text-sm">{item.word}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{item.definition}</p>
+                  <p className="text-xs text-indigo-400 italic mt-1">&ldquo;{item.example}&rdquo;</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 9. Highlights */}
         {report.highlights?.length > 0 && (
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h2 className="font-semibold text-gray-800 mb-4">Highlights</h2>
@@ -292,14 +345,20 @@ export default function ReportPage() {
           </div>
         )}
 
-        {/* 8. Practice Again */}
-        <div className="text-center py-4">
+        {/* 10. Actions */}
+        <div className="flex items-center justify-center gap-4 py-4 print:hidden">
           <Link
             href="/"
             className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm transition-colors"
           >
             Practice Again
           </Link>
+          <button
+            onClick={() => window.print()}
+            className="inline-block px-6 py-3 border border-indigo-600 text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors"
+          >
+            🖨️ Print / Save PDF
+          </button>
         </div>
       </div>
     </main>

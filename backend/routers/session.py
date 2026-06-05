@@ -34,12 +34,13 @@ async def create_session(data: SessionCreate):
     session_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     opener = SCENE_OPENERS[data.scene]
+    difficulty = data.difficulty if data.difficulty in ("easy", "medium", "hard") else "medium"
 
     previous_analysis = None
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO sessions (id, scene, status, created_at) VALUES (?, ?, 'active', ?)",
-            (session_id, data.scene, now),
+            "INSERT INTO sessions (id, scene, status, created_at, difficulty) VALUES (?, ?, 'active', ?, ?)",
+            (session_id, data.scene, now, difficulty),
         )
         await db.execute(
             "INSERT INTO messages (session_id, role, content, turn_id, created_at) VALUES (?, 'assistant', ?, 0, ?)",
@@ -70,6 +71,7 @@ async def create_session(data: SessionCreate):
         scene=data.scene,
         system_prompt=opener,
         created_at=now,
+        difficulty=difficulty,
         previous_analysis=previous_analysis,
     )
 

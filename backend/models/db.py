@@ -18,7 +18,9 @@ async def init_db():
                 scene TEXT NOT NULL,
                 status TEXT DEFAULT 'active',
                 created_at TEXT NOT NULL,
-                ended_at TEXT
+                ended_at TEXT,
+                difficulty TEXT DEFAULT 'medium',
+                cefr_level TEXT DEFAULT NULL
             )
         """)
         await db.execute("""
@@ -68,4 +70,14 @@ async def init_db():
             await db.commit()
         except Exception:
             pass  # 列已存在，忽略
+        try:
+            await db.execute("ALTER TABLE sessions ADD COLUMN difficulty TEXT DEFAULT 'medium'")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE sessions ADD COLUMN cefr_level TEXT DEFAULT NULL")
+            await db.commit()
+        except Exception:
+            pass
         await db.commit()

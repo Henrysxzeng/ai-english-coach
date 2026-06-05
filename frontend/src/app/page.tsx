@@ -188,6 +188,28 @@ export default function HomePage() {
         ))}
       </div>
 
+      {/* ── SDE Interview Entry ──────────────────────── */}
+      <div className="max-w-3xl w-full mb-6">
+        <div
+          className="cursor-pointer rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-900/40 to-purple-900/40 p-6 hover:border-indigo-500/60 transition-all"
+          onClick={() => router.push('/sde-interview')}
+        >
+          <div className="flex items-center gap-4">
+            <span className="text-4xl">🧑‍💻</span>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-white">SDE Interview Practice</h3>
+              <p className="text-sm text-gray-400 mt-0.5">
+                Behavioral · Project Deep-Dive · CS Thinking
+              </p>
+              <p className="text-xs text-indigo-400 mt-1">
+                Add your resume &amp; target JD for personalized questions
+              </p>
+            </div>
+            <span className="text-indigo-400 text-lg">→</span>
+          </div>
+        </div>
+      </div>
+
       {/* ── How to Use ───────────────────────────────── */}
       <div className="max-w-3xl w-full mb-12">
         <h2 className="text-xl font-bold text-gray-800 text-center mb-6">How to Use</h2>

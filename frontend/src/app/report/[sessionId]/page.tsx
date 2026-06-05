@@ -45,6 +45,20 @@ interface Report {
   filler_count?: number
   filler_words?: string[]
   key_vocabulary?: Array<{ word: string; definition: string; example: string }>
+  scene?: string
+  interview_feedback?: {
+    communication_score: number
+    star_coverage: {
+      situation: boolean
+      task: boolean
+      action: boolean
+      result: boolean
+    }
+    star_feedback: string
+    strengths: string[]
+    improvements: string[]
+    sample_rewrite: string
+  } | null
 }
 
 // ─── SVG ring progress bar ─────────────────────────────────────────────────────
@@ -327,6 +341,90 @@ export default function ReportPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* 8. STAR Interview Feedback (sde_* scenes only) */}
+        {report.interview_feedback && (
+          <div className="bg-gray-800 rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">🎯 Interview Performance</h2>
+
+            {/* Communication Score + STAR Coverage */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gray-700 rounded-xl p-4 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
+                  Communication Score
+                </p>
+                <p className="text-4xl font-bold text-blue-400">
+                  {report.interview_feedback.communication_score}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">/ 100</p>
+              </div>
+              <div className="bg-gray-700 rounded-xl p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+                  STAR Coverage
+                </p>
+                <div className="grid grid-cols-2 gap-1">
+                  {(['situation', 'task', 'action', 'result'] as const).map((key) => (
+                    <div key={key} className="flex items-center gap-1">
+                      <span
+                        className={
+                          report.interview_feedback!.star_coverage[key]
+                            ? 'text-green-400'
+                            : 'text-red-400'
+                        }
+                      >
+                        {report.interview_feedback!.star_coverage[key] ? '✓' : '✗'}
+                      </span>
+                      <span className="text-xs text-gray-300 capitalize">{key}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Star Feedback */}
+            {report.interview_feedback.star_feedback && (
+              <div className="bg-gray-900/50 rounded-xl p-4 italic text-gray-300 text-sm mb-4">
+                &ldquo;{report.interview_feedback.star_feedback}&rdquo;
+              </div>
+            )}
+
+            {/* Strengths + Improvements */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm font-medium text-green-400 mb-2">✅ Strengths</p>
+                <ul className="space-y-1">
+                  {report.interview_feedback.strengths.map((s, i) => (
+                    <li key={i} className="text-sm text-gray-300">
+                      • {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-orange-400 mb-2">⚠️ Areas to Improve</p>
+                <ul className="space-y-1">
+                  {report.interview_feedback.improvements.map((s, i) => (
+                    <li key={i} className="text-sm text-gray-300">
+                      • {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Sample Rewrite */}
+            {report.interview_feedback.sample_rewrite && (
+              <div className="border-l-4 border-indigo-500 pl-4 mt-4">
+                <p className="text-xs text-indigo-400 font-medium mb-1">
+                  💡 Try saying it like this:
+                </p>
+                <p className="text-sm text-gray-300 italic">
+                  {report.interview_feedback.sample_rewrite}
+                </p>
+              </div>
+            )}
           </div>
         )}
 

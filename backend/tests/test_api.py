@@ -168,3 +168,71 @@ def test_report_includes_wpm_fields():
             assert isinstance(data["filler_count"], int)
         return resp
     _run(_())
+
+
+# ── TASK-029 SDE Interview 测试用例 ──────────────────────────────────────────
+
+
+def test_create_sde_behavioral():
+    """测试创建 sde_behavioral 场景 session"""
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.post("/api/session/create", json={"scene": "sde_behavioral"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["scene"] == "sde_behavioral"
+        return resp
+    _run(_())
+
+
+def test_create_sde_project():
+    """测试创建 sde_project 场景 session"""
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.post("/api/session/create", json={"scene": "sde_project"})
+            assert resp.status_code == 200
+            assert resp.json()["scene"] == "sde_project"
+        return resp
+    _run(_())
+
+
+def test_create_sde_thinking():
+    """测试创建 sde_thinking 场景 session"""
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.post("/api/session/create", json={"scene": "sde_thinking"})
+            assert resp.status_code == 200
+        return resp
+    _run(_())
+
+
+def test_create_sde_with_resume():
+    """测试 SDE session 带 resume_context + jd_context"""
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.post("/api/session/create", json={
+                "scene": "sde_behavioral",
+                "resume_context": "Software Engineer with 3 years Python experience",
+                "jd_context": "Looking for a backend engineer with FastAPI skills",
+            })
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data.get("resume_context") == "Software Engineer with 3 years Python experience"
+            assert data.get("jd_context") == "Looking for a backend engineer with FastAPI skills"
+        return resp
+    _run(_())
+
+
+def test_sde_report_has_interview_feedback():
+    """测试 SDE 场景报告包含 interview_feedback 字段（可为 null，但键必须存在）"""
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            create = await c.post("/api/session/create", json={"scene": "sde_behavioral"})
+            session_id = create.json()["session_id"]
+            await c.post(f"/api/session/{session_id}/end")
+            resp = await c.get(f"/api/report/{session_id}")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "interview_feedback" in data  # 键必须存在（值可以是 null）
+        return resp
+    _run(_())

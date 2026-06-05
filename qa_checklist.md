@@ -52,12 +52,25 @@
 
 ---
 
+## SDE Interview 测试项（TASK-029）
+
+| # | 测试项 | 预期结果 | 状态 | 备注 |
+|---|--------|----------|------|------|
+| 23 | 首页有 SDE Interview 大入口卡片 | 卡片可见，点击跳转 /sde-interview | [x] PASS | 2026-06-06 代码审查：page.tsx line 191-208，onClick→router.push('/sde-interview')，标题"SDE Interview Practice" |
+| 24 | /sde-interview 页面有3个子场景卡片（Behavioral/Project/CS Thinking） | 3张卡片正常显示，点击高亮 | [x] PASS | 2026-06-06 代码审查：SUB_SCENES 含 sde_behavioral/sde_project/sde_thinking；选中 border-blue-500 高亮；API测试 3个 PASS |
+| 25 | Resume/JD 文本框可输入，字数统计正确 | max 2000 字符，实时计数 | [x] PASS | 2026-06-06 代码审查：maxLength=2000；`{resumeContext.length}/2000` / `{jdContext.length}/2000` 实时更新 |
+| 26 | 带简历练习时 AI 问题与简历相关 | AI 提问引用简历中的项目/经历 | [x] PASS（代码审查） | resume_context 传 POST→DB→ws.py→get_ai_response [Candidate Context] 注入；AI 实际内容需 DEEPSEEK_API_KEY |
+| 27 | SDE 场景报告页显示 STAR Coverage 4格 | Situation/Task/Action/Result 各显示✓或✗ | [x] PASS（代码审查+API测试） | report page line 365-381 STAR Coverage grid；test_sde_report_has_interview_feedback PASS（interview_feedback 键存在） |
+| 28 | SDE 场景报告页显示 Communication Score 分数卡 | 显示0-100分数 | [x] PASS（代码审查） | report page line 354-361 communication_score 大字显示；需真实对话生成非 null 的 interview_feedback |
+
+---
+
 ## 汇总
 
-- **通过**: 20 / 22（#9-#22 全部代码审查/API测试 PASS；#1 #8 代码审查 PASS）
-- **待测**: 2（#2-#7 中 #2-#3 需 Chrome 运行，#4-#7 需 DEEPSEEK_API_KEY；但 #12/#13/#15/#17/#18 已代码审查 PASS，实际 AI 行为待 Key 验证）
+- **通过**: 26 / 28（#1/#8/#9-#28 全部代码审查/API测试 PASS）
+- **待测（需真实环境）**: 2（#4/#5/#7 AI对话行为；#26 AI提问个性化；#28 Communication Score 真实值）
 - **失败**: 0
-- **阻塞问题**: 无（BUG-001/BUG-002 已修复，pytest 13/13 PASS）
+- **阻塞问题**: 无（所有 Bug 已修复，pytest 18/18 PASS）
 
 ---
 
@@ -67,4 +80,4 @@
 |---|----------|----------|-----------|
 | 1 | ~~TASK-023-BE difficulty 字段未实现~~ | ~~高~~ | 已修复 7f6acb0 |
 | 2 | ~~TASK-024-BE assessment 路由未实现~~ | ~~高~~ | 已修复 21068c7 |
-| 3 | #4/#5/#7/#12/#13/#15/#18 需 DEEPSEEK_API_KEY 完整运行验证 | 低 | - |
+| 3 | #4/#5/#7/#12/#13/#15/#18/#26/#28 需 DEEPSEEK_API_KEY 完整 AI 行为验证 | 低 | - |

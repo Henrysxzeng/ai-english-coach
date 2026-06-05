@@ -36,6 +36,7 @@ export default function SdeInterviewPage() {
   const [jdContext, setJdContext] = useState('')
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
   const [isLoading, setIsLoading] = useState(false)
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleStart() {
@@ -100,9 +101,50 @@ export default function SdeInterviewPage() {
 
           {/* Resume textarea */}
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">
-              Your Resume
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-medium text-gray-300">Your Resume</label>
+              <label
+                className={`cursor-pointer text-xs px-3 py-1 rounded-lg border transition-colors ${
+                  isUploadingPdf
+                    ? 'border-gray-600 text-gray-500 cursor-not-allowed'
+                    : 'border-indigo-500 text-indigo-400 hover:bg-indigo-900/30'
+                }`}
+              >
+                {isUploadingPdf ? 'Parsing...' : '📄 Upload PDF'}
+                <input
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  disabled={isUploadingPdf}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setIsUploadingPdf(true)
+                    setError(null)
+                    try {
+                      const formData = new FormData()
+                      formData.append('file', file)
+                      const resp = await fetch(
+                        `${API_URL}/api/parse-resume-pdf`,
+                        { method: 'POST', body: formData },
+                      )
+                      if (!resp.ok) {
+                        const data = await resp.json()
+                        throw new Error(data.detail || 'Failed to parse PDF')
+                      }
+                      const data = await resp.json()
+                      setResumeContext(data.text)
+                    } catch (err: unknown) {
+                      const message = err instanceof Error ? err.message : 'Failed to parse PDF'
+                      setError(message + '. Try pasting your resume instead.')
+                    } finally {
+                      setIsUploadingPdf(false)
+                      e.target.value = ''
+                    }
+                  }}
+                />
+              </label>
+            </div>
             <div className="relative">
               <textarea
                 value={resumeContext}

@@ -1,6 +1,6 @@
 # routers/parse_pdf.py | backend | v1.0
 from fastapi import APIRouter, UploadFile, File, HTTPException
-import pdfplumber
+from pypdf import PdfReader
 import io
 
 router = APIRouter()
@@ -12,15 +12,15 @@ async def parse_resume_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
     content = await file.read()
-    if len(content) > 5 * 1024 * 1024:  # 5MB limit
+    if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB.")
 
     try:
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            pages = len(pdf.pages)
-            text = "\n".join(
-                page.extract_text() or "" for page in pdf.pages
-            ).strip()
+        reader = PdfReader(io.BytesIO(content))
+        pages = len(reader.pages)
+        text = "\n".join(
+            page.extract_text() or "" for page in reader.pages
+        ).strip()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)}")
 

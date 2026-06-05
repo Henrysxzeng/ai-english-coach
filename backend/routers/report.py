@@ -1,11 +1,14 @@
-﻿# routers/report.py | backend | v1.1
+﻿# routers/report.py | backend | v1.2
 import os
+import re
 import json
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 import aiosqlite
 from dotenv import load_dotenv
 from services.llm_service import generate_report_scores
+
+FILLER_RE = r'\b(um+|uh+|hmm+|like|you know|sort of|kind of|basically|literally|i mean)\b'
 
 load_dotenv()
 
@@ -35,6 +38,12 @@ async def get_report(session_id: str):
         )
         corrections_raw = [dict(c) for c in await cursor.fetchall()]
 
+        cursor = await db.execute(
+            "SELECT content, recording_duration_ms FROM messages WHERE session_id = ? AND role = 'user' ORDER BY id",
+            (session_id,),
+        )
+        user_msg_rows = [dict(r) for r in await cursor.fetchall()]
+
     duration = 0
     if session["created_at"] and session["ended_at"]:
         try:
@@ -45,6 +54,23 @@ async def get_report(session_id: str):
             pass
 
     user_turns = sum(1 for m in messages if m["role"] == "user")
+
+    # WPM calculation
+    total_words = sum(len(r["content"].split()) for r in user_msg_rows)
+    total_min = sum(r["recording_duration_ms"] for r in user_msg_rows) / 60000
+    wpm = round(total_words / total_min) if total_min > 0.05 else None
+    wpm_label = (
+        "Above average" if wpm and wpm >= 140
+        else "Average" if wpm and wpm >= 110
+        else "Below average" if wpm
+        else None
+    )
+    wpm_context = "Normal conversational pace is 110–140 WPM"
+
+    # Filler word detection
+    all_text = " ".join(r["content"].lower() for r in user_msg_rows)
+    filler_count = len(re.findall(FILLER_RE, all_text))
+    filler_words = list(set(re.findall(FILLER_RE, all_text)))[:5]
 
     if user_turns == 0:
         return {
@@ -60,6 +86,11 @@ async def get_report(session_id: str):
             "corrections": [],
             "suggestions": ["Please complete at least one conversation turn"],
             "highlights": [],
+            "wpm": None,
+            "wpm_label": None,
+            "wpm_context": wpm_context,
+            "filler_count": 0,
+            "filler_words": [],
         }
 
     scores = await generate_report_scores(session_id, messages, corrections_raw)
@@ -93,4 +124,9 @@ async def get_report(session_id: str):
         "total_turns": user_turns,
         **scores,
         "corrections": corrections_raw,
+        "wpm": wpm,
+        "wpm_label": wpm_label,
+        "wpm_context": wpm_context,
+        "filler_count": filler_count,
+        "filler_words": filler_words,
     }

@@ -30,6 +30,7 @@ async def init_db():
                 audio_path TEXT,
                 turn_id INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL,
+                recording_duration_ms INTEGER DEFAULT 0,
                 FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
         """)
@@ -62,4 +63,9 @@ async def init_db():
                 FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
         """)
+        try:
+            await db.execute("ALTER TABLE messages ADD COLUMN recording_duration_ms INTEGER DEFAULT 0")
+            await db.commit()
+        except Exception:
+            pass  # 列已存在，忽略
         await db.commit()

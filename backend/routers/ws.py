@@ -93,6 +93,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             if not user_text:
                 continue
 
+            duration_ms = int(msg.get("duration_ms") or 0)
             now = datetime.now(timezone.utc).isoformat()
 
             # Load message history
@@ -132,8 +133,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     return
 
                 await db.execute(
-                    "INSERT INTO messages (session_id, role, content, turn_id, created_at) VALUES (?, 'user', ?, ?, ?)",
-                    (session_id, user_text, turn_id, now),
+                    "INSERT INTO messages (session_id, role, content, turn_id, created_at, recording_duration_ms) VALUES (?, 'user', ?, ?, ?, ?)",
+                    (session_id, user_text, turn_id, now, duration_ms),
                 )
                 await db.execute(
                     "INSERT INTO messages (session_id, role, content, turn_id, created_at) VALUES (?, 'assistant', ?, ?, ?)",

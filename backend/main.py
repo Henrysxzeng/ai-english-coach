@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from models.db import init_db
 from routers import session, ws, report, history, assessment
+from routers.parse_pdf import router as parse_pdf_router
 
 
 @asynccontextmanager
@@ -27,6 +28,7 @@ app.include_router(ws.router)
 app.include_router(report.router)
 app.include_router(history.router)
 app.include_router(assessment.router)
+app.include_router(parse_pdf_router)
 
 
 @app.get("/health")

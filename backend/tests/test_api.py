@@ -70,3 +70,19 @@ def test_end_session():
     resp = _run(_())
     assert resp.status_code == 200
     assert resp.json()["status"] == "ended"
+
+
+def test_get_report_empty_session():
+    """测试0轮对话的报告接口是否正常返回（不崩溃）"""
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            create_resp = await c.post("/api/session/create", json={"scene": "meeting"})
+            session_id = create_resp.json()["session_id"]
+            await c.post(f"/api/session/{session_id}/end")
+            return await c.get(f"/api/report/{session_id}")
+
+    resp = _run(_())
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "overall_score" in data
+    assert isinstance(data["overall_score"], (int, float))

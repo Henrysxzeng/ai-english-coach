@@ -41,19 +41,28 @@ export default function HomePage() {
     if (loading) return
     setLoading(sceneId)
     setError(null)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
     try {
       const res = await fetch(`${API_URL}/api/session/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scene: sceneId }),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const data = await res.json()
       const sessionId = data.session_id
       if (!sessionId) throw new Error('No session ID in response')
       router.push(`/practice/${sceneId}?session_id=${sessionId}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to connect')
+      clearTimeout(timeoutId)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Connection timed out — is the backend running?')
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to connect')
+      }
       setLoading(null)
     }
   }

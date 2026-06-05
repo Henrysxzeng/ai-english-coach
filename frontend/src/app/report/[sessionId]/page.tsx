@@ -15,6 +15,12 @@ interface CorrectionItem {
   explanation: string
 }
 
+interface AmbiguousExpression {
+  original: string
+  better: string
+  explanation: string
+}
+
 interface Report {
   session_id: string
   scene: string
@@ -28,6 +34,11 @@ interface Report {
   corrections: CorrectionItem[]
   suggestions: string[]
   highlights: string[]
+  topic?: string
+  clarity_score?: number
+  structure_score?: number
+  ambiguous_expressions?: AmbiguousExpression[]
+  weak_areas?: string[]
 }
 
 // ─── SVG ring progress bar ─────────────────────────────────────────────────────
@@ -155,8 +166,11 @@ export default function ReportPage() {
           <p className="text-gray-500 text-sm capitalize">
             {report.scene}
             {report.total_turns > 0 && ` · ${report.total_turns} turns`}
-            {durationMin && ` · ${durationMin} min`}
+            {!!durationMin && ` · ${durationMin} min`}
           </p>
+          {report.topic && (
+            <p className="text-xs text-indigo-500 font-medium mt-1">📌 {report.topic}</p>
+          )}
         </div>
 
         {/* 1. Overall score ring */}
@@ -190,12 +204,28 @@ export default function ReportPage() {
             suffix="errors"
             accent="border-red-400"
           />
+          {report.clarity_score != null && (
+            <ScoreCard
+              label="Expression Clarity"
+              value={report.clarity_score}
+              suffix="/100"
+              accent="border-teal-400"
+            />
+          )}
+          {report.structure_score != null && (
+            <ScoreCard
+              label="Response Structure"
+              value={report.structure_score}
+              suffix="/100"
+              accent="border-orange-400"
+            />
+          )}
         </div>
 
         {/* 3. Corrections list */}
-        {report.corrections?.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="font-semibold text-gray-800 mb-4">Grammar Corrections</h2>
+        <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <h2 className="font-semibold text-gray-800 mb-4">Grammar Corrections</h2>
+          {report.corrections?.length > 0 ? (
             <div className="space-y-4">
               {report.corrections.map((c, i) => (
                 <div key={i} className="border border-gray-100 rounded-xl p-4">
@@ -208,10 +238,31 @@ export default function ReportPage() {
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="text-sm text-green-600 font-medium">No grammar errors detected — great job!</p>
+          )}
+        </div>
+
+        {/* 4. Ambiguous expressions */}
+        {report.ambiguous_expressions && report.ambiguous_expressions.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <h2 className="font-semibold text-gray-800 mb-4">💬 Clearer Ways to Say It</h2>
+            <div className="space-y-4">
+              {report.ambiguous_expressions.map((item, i) => (
+                <div key={i} className="border border-gray-100 rounded-xl p-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="text-gray-500 text-sm line-through">{item.original}</span>
+                    <span className="text-gray-300 text-sm">→</span>
+                    <span className="text-teal-600 text-sm font-semibold">{item.better}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">{item.explanation}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* 4. Improvement suggestions */}
+        {/* 6. Improvement suggestions */}
         {report.suggestions?.length > 0 && (
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h2 className="font-semibold text-gray-800 mb-4">Improvement Suggestions</h2>
@@ -226,7 +277,7 @@ export default function ReportPage() {
           </div>
         )}
 
-        {/* 5. Highlights */}
+        {/* 7. Highlights */}
         {report.highlights?.length > 0 && (
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h2 className="font-semibold text-gray-800 mb-4">Highlights</h2>
@@ -241,7 +292,7 @@ export default function ReportPage() {
           </div>
         )}
 
-        {/* 6. Practice Again */}
+        {/* 8. Practice Again */}
         <div className="text-center py-4">
           <Link
             href="/"

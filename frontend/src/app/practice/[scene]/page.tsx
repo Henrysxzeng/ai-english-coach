@@ -4,6 +4,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -38,9 +39,13 @@ function PracticeContent({ scene }: { scene: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [correction, setCorrection] = useState<Correction | null>(null)
   const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isWaiting, setIsWaiting] = useState(false)
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
   const [statusText, setStatusText] = useState('Connecting to server...')
   const [isEnding, setIsEnding] = useState(false)
+  const [hasMemory, setHasMemory] = useState(false)
+  const [memoryGreeting, setMemoryGreeting] = useState('')
 
   const wsRef = useRef<WebSocket | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,6 +56,14 @@ function PracticeContent({ scene }: { scene: string }) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Pre-load speech synthesis voices so they're ready on first use
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.getVoices()
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices()
+    }
+  }, [])
 
   // Connect WebSocket and load initial session messages
   useEffect(() => {
@@ -92,6 +105,7 @@ function PracticeContent({ scene }: { scene: string }) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = JSON.parse(event.data)
         if (data.type === 'response') {
+          setIsWaiting(false)
           setMessages((prev) => {
             const next = [...prev]
             if (data.user_text) next.push({ role: 'user', text: data.user_text })
@@ -99,7 +113,41 @@ function PracticeContent({ scene }: { scene: string }) {
             return next
           })
           if (data.correction) setCorrection(data.correction)
-          // Speak AI reply using Web Speech Synthesis
+          if (data.ai_text && typeof window !== 'undefined' && window.speechSynthesis) {
+            window.speechSynthesis.cancel()
+            const utt = new SpeechSynthesisUtterance(data.ai_text)
+            utt.lang = 'en-US'
+            utt.rate = 0.9
+            utt.pitch = 1.0
+            // Pick the best available US English voice (prefer Google US English)
+            const voices = window.speechSynthesis.getVoices()
+            const preferred = voices.find(v => v.name === 'Google US English')
+              || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('google'))
+              || voices.find(v => v.lang === 'en-US' && !v.name.toLowerCase().includes('zira'))
+              || voices.find(v => v.lang === 'en-US')
+            if (preferred) utt.voice = preferred
+            utt.onend = () => {
+              setIsSpeaking(false)
+              setStatusText('Click mic to speak')
+            }
+            utt.onerror = () => {
+              setIsSpeaking(false)
+              setStatusText('Click mic to speak')
+            }
+            setIsSpeaking(true)
+            setStatusText('AI is speaking...')
+            window.speechSynthesis.speak(utt)
+          } else {
+            setStatusText('Click mic to speak')
+          }
+        } else if (data.type === 'greeting') {
+          if (data.has_memory) {
+            setHasMemory(true)
+            setMemoryGreeting(data.ai_text ?? '')
+          }
+          if (data.ai_text) {
+            setMessages((prev) => [...prev, { role: 'ai', text: data.ai_text }])
+          }
           if (data.ai_text && typeof window !== 'undefined' && window.speechSynthesis) {
             window.speechSynthesis.cancel()
             const utt = new SpeechSynthesisUtterance(data.ai_text)
@@ -109,6 +157,7 @@ function PracticeContent({ scene }: { scene: string }) {
           }
           setStatusText('Click mic to speak')
         } else if (data.type === 'error') {
+          setIsWaiting(false)
           setStatusText(`Server error: ${data.message}`)
         }
       } catch {
@@ -147,28 +196,48 @@ function PracticeContent({ scene }: { scene: string }) {
     recognition.interimResults = false
     recognitionRef.current = recognition
 
+    // Accumulate transcript across multiple onresult firings (Chrome behaviour)
+    let accumulatedText = ''
+
     recognition.onstart = () => {
+      accumulatedText = ''
       setIsListening(true)
       setStatusText('Listening… (click to stop)')
     }
     recognition.onend = () => {
       setIsListening(false)
+      const text = accumulatedText.trim()
+      accumulatedText = ''
+      if (!text) return
+      // Reject non-English input (CJK characters)
+      if (/[一-鿿぀-ヿ가-힯]/.test(text)) {
+        setStatusText('Please speak in English 🇬🇧')
+        return
+      }
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'user_message', text }))
+        setIsWaiting(true)
+        setStatusText('Waiting for AI...')
+      } else {
+        setStatusText('WebSocket not connected')
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onerror = (e: any) => {
       setIsListening(false)
+      accumulatedText = ''
       if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (e: any) => {
-      const text: string = e.results[0][0].transcript.trim()
-      if (!text) return
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'user_message', text }))
-        setStatusText('Waiting for AI response…')
-      } else {
-        setStatusText('WebSocket not connected')
+      // Collect all final results — Chrome may fire this multiple times
+      let text = ''
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          text += e.results[i][0].transcript
+        }
       }
+      accumulatedText = text
     }
 
     try {
@@ -189,8 +258,21 @@ function PracticeContent({ scene }: { scene: string }) {
     router.push(`/report/${sessionId}`)
   }
 
+  if (!sessionId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-red-500 text-sm font-semibold">Invalid session</p>
+          <Link href="/" className="text-indigo-600 hover:underline text-sm">
+            ← Back to Home
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* ── Header ────────────────────────────────── */}
       <header className="bg-white border-b shadow-sm px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -218,6 +300,20 @@ function PracticeContent({ scene }: { scene: string }) {
           {isEnding ? 'Ending…' : 'End Practice'}
         </button>
       </header>
+
+      {/* ── Memory banner ─────────────────────────── */}
+      {hasMemory && (
+        <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-2 flex items-center gap-2 text-sm text-indigo-700">
+          <span>🧠</span>
+          <span>AI remembered your last session and will focus on your weak areas today</span>
+          <button
+            onClick={() => setHasMemory(false)}
+            className="ml-auto text-indigo-400 hover:text-indigo-600"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ── Body ──────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
@@ -259,6 +355,18 @@ function PracticeContent({ scene }: { scene: string }) {
                 </div>
               ))
             )}
+            {isWaiting && (
+              <div className="flex items-end gap-2 justify-start">
+                <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  AI
+                </div>
+                <div className="bg-blue-500 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
             <div ref={chatEndRef} />
           </div>
 
@@ -266,14 +374,14 @@ function PracticeContent({ scene }: { scene: string }) {
           <div className="border-t bg-white p-5 flex flex-col items-center gap-2">
             <button
               onClick={handleMicClick}
-              disabled={wsStatus !== 'connected'}
+              disabled={wsStatus !== 'connected' || isSpeaking || isWaiting}
               aria-label={isListening ? 'Stop recording' : 'Start recording'}
               className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-150 shadow-md focus:outline-none focus:ring-4 focus:ring-offset-2 ${
                 isListening
                   ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 scale-110 animate-pulse'
-                  : wsStatus === 'connected'
-                  ? 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300 hover:scale-105'
-                  : 'bg-gray-300 cursor-not-allowed'
+                  : wsStatus !== 'connected' || isSpeaking || isWaiting
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300 hover:scale-105'
               }`}
             >
               🎤

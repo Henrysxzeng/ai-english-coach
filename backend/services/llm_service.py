@@ -1,4 +1,4 @@
-# services/llm_service.py | backend | v1.4
+# services/llm_service.py | backend | v2.0
 from __future__ import annotations
 import os
 import json
@@ -46,6 +46,35 @@ SCENE_PROMPTS = {
         "Keep your response under 3 sentences. "
         + _HUMAN_STYLE
     ),
+    "hospital": (
+        "You are a friendly doctor or nurse at a US clinic. The patient is describing symptoms or asking health questions. "
+        "Be clear, warm, and professional. Ask one question at a time. Keep responses under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "phone_call": (
+        "You are on a business phone call in the US. Stay professional and natural. "
+        "Listen carefully and respond to what's being discussed. Keep responses under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "customer_service": (
+        "You are a friendly customer service representative for a US tech company. "
+        "The customer may have a complaint or question. Acknowledge their concern, then help resolve it. "
+        "Keep responses under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "assessment": (
+        "You are conducting a friendly English speaking proficiency test. Ask open-ended questions "
+        "to assess the user's vocabulary range, grammar accuracy, and fluency. "
+        "Start with: 'Tell me about yourself — what do you do and what are your hobbies?' "
+        "Then ask 2-3 natural follow-up questions based on their answers. "
+        "Be warm and encouraging. Keep each response under 2 sentences."
+    ),
+}
+
+DIFFICULTY_SUFFIX = {
+    "easy": " Use simple vocabulary (A2 level). Keep sentences short. Be very patient and encouraging.",
+    "medium": "",
+    "hard": " Use advanced vocabulary, idioms, and natural fast speech (C1 level). Challenge the user with complex questions.",
 }
 
 EMPTY_CORRECTION = {
@@ -59,8 +88,8 @@ EMPTY_CORRECTION = {
 VALID_WEAK_AREAS = {"grammar", "clarity", "structure", "vocabulary", "response_completeness"}
 
 
-async def get_ai_response(scene: str, messages: list[dict]) -> str:
-    system_prompt = SCENE_PROMPTS.get(scene, SCENE_PROMPTS["interview"])
+async def get_ai_response(scene: str, messages: list[dict], difficulty: str = "medium") -> str:
+    system_prompt = SCENE_PROMPTS.get(scene, SCENE_PROMPTS["interview"]) + DIFFICULTY_SUFFIX.get(difficulty, "")
     response = await client.chat.completions.create(
         model="deepseek-chat",
         messages=[{"role": "system", "content": system_prompt}] + messages,
@@ -133,6 +162,7 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
             "structure_score": 0.0,
             "ambiguous_expressions": [],
             "weak_areas": [],
+            "key_vocabulary": [],
             "suggestions": ["Complete a conversation session first."],
             "highlights": [],
         }
@@ -175,13 +205,16 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
         '{"topic": str, "fluency_score": float, "vocabulary_score": float, "overall_score": float, '
         '"clarity_score": float, "structure_score": float, '
         '"ambiguous_expressions": [{"original": str, "better": str, "explanation": str}], '
-        '"weak_areas": [str], "suggestions": [str, str, str], "highlights": [str, str]}\n\n'
+        '"weak_areas": [str], '
+        '"key_vocabulary": [{"word": str, "definition": str, "example": str}], '
+        '"suggestions": [str, str, str], "highlights": [str, str]}\n\n'
         "Requirements:\n"
         "- topic: 1 sentence describing what the conversation was about\n"
         "- All scores between 0.0 and 100.0, differentiated and realistic\n"
         "- overall_score MUST fall in the band above\n"
         "- ambiguous_expressions: max 3, only expressions that would genuinely confuse a native speaker\n"
         "- weak_areas: max 3, only from: grammar, clarity, structure, vocabulary, response_completeness\n"
+        "- key_vocabulary: 3-5 useful words or phrases for this scene. Include words the user used well AND important vocabulary they missed. Keep definitions under 10 words. Use a real example sentence.\n"
         "- suggestions: 3 specific tips referencing actual phrases from the user's sentences\n"
         "- highlights: 2 genuine strengths from actual sentences; if none, note their effort\n"
         "Output only the JSON, nothing else."
@@ -192,7 +225,7 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
         response = await client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=600,
+            max_tokens=800,
             temperature=0.3,
         )
         text = response.choices[0].message.content.strip()
@@ -215,6 +248,8 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
         result.setdefault("structure_score", 70.0)
         result.setdefault("ambiguous_expressions", [])
         result.setdefault("weak_areas", [])
+        result.setdefault("key_vocabulary", [])
+        result["key_vocabulary"] = result["key_vocabulary"][:5]
     except Exception:
         result = {
             "pronunciation_score": pronunciation_score,
@@ -227,6 +262,7 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
             "structure_score": 70.0,
             "ambiguous_expressions": [],
             "weak_areas": ["grammar"] if grammar_errors > 2 else [],
+            "key_vocabulary": [],
             "suggestions": [
                 "Practice using more varied sentence structures.",
                 "Expand your vocabulary with topic-specific words.",
@@ -308,6 +344,64 @@ async def generate_memory_greeting(scene: str, previous_analysis: dict) -> str:
         temperature=0.7,
     )
     return response.choices[0].message.content.strip()
+
+
+async def generate_assessment_result(messages: list[dict]) -> dict:
+    """根据5轮对话估算用户 CEFR 口语水平。"""
+    user_messages = [m["content"] for m in messages if m["role"] == "user"]
+    if not user_messages:
+        return {
+            "cefr_level": "B1",
+            "level_label": "Intermediate",
+            "strengths": ["Willing to practice"],
+            "areas_to_improve": ["Keep practicing"],
+            "recommended_difficulty": "medium",
+        }
+
+    conversation = "\n".join(f"- {m}" for m in user_messages)
+    prompt = (
+        "You are an English proficiency examiner. Analyze these speaking samples:\n\n"
+        f"{conversation}\n\n"
+        "Rate the speaker's CEFR level based on:\n"
+        "A2: Simple sentences, many grammar errors, very limited vocabulary\n"
+        "B1: Can communicate basic ideas, grammar errors present, moderate vocabulary\n"
+        "B2: Generally correct grammar, varied vocabulary, occasional mistakes\n"
+        "C1: Fluent, rich vocabulary, complex structures, rare errors\n\n"
+        "Reply ONLY with JSON:\n"
+        '{"cefr_level": "A2"|"B1"|"B2"|"C1", "level_label": str, '
+        '"strengths": [str, str], "areas_to_improve": [str, str], '
+        '"recommended_difficulty": "easy"|"medium"|"hard"}\n\n'
+        "level_label examples: Beginner, Elementary, Intermediate, Upper-Intermediate, Advanced\n"
+        "recommended_difficulty: easy for A2, medium for B1-B2, hard for C1\n"
+        "Output only the JSON."
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.2,
+        )
+        text = response.choices[0].message.content.strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
+        result.setdefault("cefr_level", "B1")
+        result.setdefault("level_label", "Intermediate")
+        result.setdefault("strengths", ["Good effort"])
+        result.setdefault("areas_to_improve", ["Keep practicing"])
+        result.setdefault("recommended_difficulty", "medium")
+        return result
+    except Exception:
+        return {
+            "cefr_level": "B1",
+            "level_label": "Intermediate",
+            "strengths": ["Willing to practice English"],
+            "areas_to_improve": ["Work on grammar accuracy"],
+            "recommended_difficulty": "medium",
+        }
 
 
 if __name__ == "__main__":

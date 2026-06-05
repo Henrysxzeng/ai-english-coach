@@ -1,6 +1,5 @@
-// file: src/app/report/[sessionId]/page.tsx — TASK-014
+// file: src/app/report/[sessionId]/page.tsx — TASK-014 / TASK-032
 // owner: Frontend Engineer
-// version: 1.0
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -66,68 +65,39 @@ function ScoreRing({ score }: { score: number }) {
   const r = 52
   const circ = 2 * Math.PI * r
   const filled = (Math.max(0, Math.min(100, score)) / 100) * circ
-  const color = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444'
 
   return (
     <div className="flex flex-col items-center">
       <svg width="144" height="144" viewBox="0 0 144 144">
-        {/* Track */}
-        <circle cx="72" cy="72" r={r} fill="none" stroke="#e5e7eb" strokeWidth="14" />
-        {/* Progress */}
+        <circle cx="72" cy="72" r={r} fill="none" stroke="#fce7f3" strokeWidth="14" />
         <circle
-          cx="72"
-          cy="72"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="14"
-          strokeLinecap="round"
+          cx="72" cy="72" r={r} fill="none"
+          stroke="#f43f5e" strokeWidth="14" strokeLinecap="round"
           strokeDasharray={`${filled} ${circ - filled}`}
           transform="rotate(-90 72 72)"
           style={{ transition: 'stroke-dasharray 1.2s ease' }}
         />
-        {/* Score text */}
-        <text
-          x="72"
-          y="65"
-          textAnchor="middle"
-          fill={color}
-          style={{ fontSize: '32px', fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}
-        >
+        <text x="72" y="65" textAnchor="middle" fill="#f43f5e"
+          style={{ fontSize: '32px', fontWeight: 700, fontFamily: 'system-ui, sans-serif' }}>
           {Math.round(score)}
         </text>
-        <text
-          x="72"
-          y="88"
-          textAnchor="middle"
-          fill="#9ca3af"
-          style={{ fontSize: '12px', fontFamily: 'system-ui, sans-serif' }}
-        >
+        <text x="72" y="88" textAnchor="middle" fill="#9ca3af"
+          style={{ fontSize: '12px', fontFamily: 'system-ui, sans-serif' }}>
           / 100
         </text>
       </svg>
-      <p className="text-sm font-semibold text-gray-500 mt-1">Overall Score</p>
+      <p className="text-sm font-semibold text-gray-400 mt-1">Overall Score</p>
     </div>
   )
 }
 
 // ─── Score card ────────────────────────────────────────────────────────────────
 
-function ScoreCard({
-  label,
-  value,
-  suffix = '',
-  accent,
-}: {
-  label: string
-  value: number
-  suffix?: string
-  accent: string
-}) {
+function ScoreCard({ label, value, suffix = '' }: { label: string; value: number; suffix?: string }) {
   return (
-    <div className={`bg-white rounded-2xl p-5 shadow-sm border-l-4 ${accent}`}>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{label}</p>
-      <p className="text-3xl font-bold text-gray-800">
+    <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-5 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
+      <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">{label}</p>
+      <p className="text-3xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
         {Math.round(value)}
         <span className="text-base font-normal text-gray-400 ml-1">{suffix}</span>
       </p>
@@ -145,22 +115,17 @@ export default function ReportPage() {
 
   useEffect(() => {
     fetch(`${API_URL}/api/report/${sessionId}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then(setReport)
       .catch((e: Error) => setError(e.message))
   }, [sessionId])
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <p className="text-red-500 text-sm">Failed to load report: {error}</p>
-          <Link href="/" className="text-indigo-600 hover:underline text-sm">
-            ← Back to Home
-          </Link>
+          <p className="text-rose-500 text-sm">Failed to load report: {error}</p>
+          <Link href="/" className="text-rose-400 hover:text-rose-500 text-sm">← Back to Home</Link>
         </div>
       </div>
     )
@@ -168,8 +133,8 @@ export default function ReportPage() {
 
   if (!report) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin" />
       </div>
     )
   }
@@ -177,83 +142,60 @@ export default function ReportPage() {
   const durationMin = report.duration_seconds > 0 ? Math.round(report.duration_seconds / 60) : null
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-10 px-4">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 py-10 px-4">
+      {/* 环境光晕 */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-rose-200/40 blur-[100px]" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-200/30 blur-[120px]" />
+      </div>
+
       <div className="max-w-xl mx-auto space-y-6">
         {/* Title */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Practice Report</h1>
-          <p className="text-gray-500 text-sm capitalize">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-1">Practice Report</h1>
+          <p className="text-gray-400 text-sm capitalize">
             {report.scene}
             {report.total_turns > 0 && ` · ${report.total_turns} turns`}
             {!!durationMin && ` · ${durationMin} min`}
           </p>
           {report.topic && (
-            <p className="text-xs text-indigo-500 font-medium mt-1">📌 {report.topic}</p>
+            <span className="inline-block mt-2 bg-rose-50 text-rose-500 border border-rose-200 rounded-full px-3 py-0.5 text-xs font-medium">
+              📌 {report.topic}
+            </span>
           )}
         </div>
 
         {/* 1. Overall score ring */}
-        <div className="bg-white rounded-2xl p-8 shadow-sm flex justify-center">
+        <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-8 shadow-[0_4px_24px_rgba(244,114,182,0.08)] flex justify-center">
           <ScoreRing score={report.overall_score ?? 0} />
         </div>
 
-        {/* 2. Four score cards */}
+        {/* 2. Score cards */}
         <div className="grid grid-cols-2 gap-3">
-          <ScoreCard
-            label="Pronunciation"
-            value={report.pronunciation_score ?? 0}
-            suffix="/100"
-            accent="border-blue-400"
-          />
-          <ScoreCard
-            label="Fluency"
-            value={report.fluency_score ?? 0}
-            suffix="/100"
-            accent="border-green-400"
-          />
-          <ScoreCard
-            label="Vocabulary"
-            value={report.vocabulary_score ?? 0}
-            suffix="/100"
-            accent="border-purple-400"
-          />
-          <ScoreCard
-            label="Grammar Errors"
-            value={report.grammar_errors ?? 0}
-            suffix="errors"
-            accent="border-red-400"
-          />
+          <ScoreCard label="Pronunciation" value={report.pronunciation_score ?? 0} suffix="/100" />
+          <ScoreCard label="Fluency"        value={report.fluency_score ?? 0}        suffix="/100" />
+          <ScoreCard label="Vocabulary"     value={report.vocabulary_score ?? 0}     suffix="/100" />
+          <ScoreCard label="Grammar Errors" value={report.grammar_errors ?? 0}       suffix="errors" />
           {report.clarity_score != null && (
-            <ScoreCard
-              label="Expression Clarity"
-              value={report.clarity_score}
-              suffix="/100"
-              accent="border-teal-400"
-            />
+            <ScoreCard label="Expression Clarity" value={report.clarity_score} suffix="/100" />
           )}
           {report.structure_score != null && (
-            <ScoreCard
-              label="Response Structure"
-              value={report.structure_score}
-              suffix="/100"
-              accent="border-orange-400"
-            />
+            <ScoreCard label="Response Structure" value={report.structure_score} suffix="/100" />
           )}
         </div>
 
-        {/* 3. Corrections list */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        {/* 3. Grammar Corrections */}
+        <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
           <h2 className="font-semibold text-gray-800 mb-4">Grammar Corrections</h2>
           {report.corrections?.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {report.corrections.map((c, i) => (
-                <div key={i} className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <span className="text-red-500 text-sm line-through">{c.original}</span>
-                    <span className="text-gray-300 text-sm">→</span>
-                    <span className="text-green-600 text-sm font-semibold">{c.corrected}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 leading-relaxed">{c.explanation}</p>
+                <div key={i} className="bg-rose-50 border border-rose-100 rounded-xl p-4">
+                  <p className="text-xs text-rose-500 font-medium mb-1">Original</p>
+                  <p className="text-sm text-gray-600 line-through">{c.original}</p>
+                  <p className="text-xs text-green-600 font-medium mt-2 mb-1">✓ Corrected</p>
+                  <p className="text-sm text-gray-800 font-medium">{c.corrected}</p>
+                  <p className="text-xs text-gray-400 mt-2 leading-relaxed">{c.explanation}</p>
                 </div>
               ))}
             </div>
@@ -262,31 +204,26 @@ export default function ReportPage() {
           )}
         </div>
 
-        {/* 4. Fluency analysis */}
+        {/* 4. Fluency Analysis */}
         {report.wpm != null && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
             <h2 className="font-semibold text-gray-800 mb-3">🎙️ Fluency Analysis</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Speaking Speed</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  {report.wpm}{' '}
-                  <span className="text-sm font-normal text-gray-400">WPM</span>
+                <p className="text-2xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
+                  {report.wpm} <span className="text-sm font-normal text-gray-400">WPM</span>
                 </p>
-                {report.wpm_label && (
-                  <p className="text-sm text-indigo-600 font-medium mt-0.5">{report.wpm_label}</p>
-                )}
-                {report.wpm_context && (
-                  <p className="text-xs text-gray-400 mt-1">{report.wpm_context}</p>
-                )}
+                {report.wpm_label && <p className="text-sm text-rose-400 font-medium mt-0.5">{report.wpm_label}</p>}
+                {report.wpm_context && <p className="text-xs text-gray-400 mt-1">{report.wpm_context}</p>}
               </div>
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Filler Words</p>
-                <p className="text-2xl font-bold text-gray-800">{report.filler_count ?? 0}</p>
+                <p className="text-2xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
+                  {report.filler_count ?? 0}
+                </p>
                 {report.filler_words && report.filler_words.length > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Detected: {report.filler_words.join(', ')}
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Detected: {report.filler_words.join(', ')}</p>
                 )}
               </div>
             </div>
@@ -295,17 +232,17 @@ export default function ReportPage() {
 
         {/* 5. Ambiguous expressions */}
         {report.ambiguous_expressions && report.ambiguous_expressions.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
             <h2 className="font-semibold text-gray-800 mb-4">💬 Clearer Ways to Say It</h2>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {report.ambiguous_expressions.map((item, i) => (
-                <div key={i} className="border border-gray-100 rounded-xl p-4">
+                <div key={i} className="bg-rose-50 border border-rose-100 rounded-xl p-4">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="text-gray-500 text-sm line-through">{item.original}</span>
-                    <span className="text-gray-300 text-sm">→</span>
-                    <span className="text-teal-600 text-sm font-semibold">{item.better}</span>
+                    <span className="text-rose-300 text-sm">→</span>
+                    <span className="text-rose-500 text-sm font-semibold">{item.better}</span>
                   </div>
-                  <p className="text-xs text-gray-500 leading-relaxed">{item.explanation}</p>
+                  <p className="text-xs text-gray-400 leading-relaxed">{item.explanation}</p>
                 </div>
               ))}
             </div>
@@ -314,12 +251,12 @@ export default function ReportPage() {
 
         {/* 6. Improvement suggestions */}
         {report.suggestions?.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
             <h2 className="font-semibold text-gray-800 mb-4">Improvement Suggestions</h2>
             <ul className="space-y-2">
               {report.suggestions.map((s, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                  <span className="text-indigo-500 font-bold mt-0.5 flex-shrink-0">•</span>
+                  <span className="text-rose-400 font-bold mt-0.5 flex-shrink-0">•</span>
                   <span>{s}</span>
                 </li>
               ))}
@@ -327,55 +264,45 @@ export default function ReportPage() {
           </div>
         )}
 
-        {/* 7. Key vocabulary */}
+        {/* 7. Key Vocabulary */}
         {report.key_vocabulary && report.key_vocabulary.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
             <h2 className="font-semibold text-gray-800 mb-4">📚 Key Vocabulary</h2>
             <div className="space-y-3">
               {report.key_vocabulary.map((item, i) => (
-                <div key={i} className="border border-gray-100 rounded-xl p-4">
+                <div key={i} className="border border-pink-100 bg-white/60 rounded-xl p-4">
                   <p className="font-semibold text-gray-800 text-sm">{item.word}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{item.definition}</p>
-                  <p className="text-xs text-indigo-400 italic mt-1">&ldquo;{item.example}&rdquo;</p>
+                  <p className="text-xs text-rose-400 italic mt-1">&ldquo;{item.example}&rdquo;</p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* 8. STAR Interview Feedback (sde_* scenes only) */}
+        {/* 8. STAR Interview Feedback (sde_* scenes) */}
         {report.interview_feedback && (
-          <div className="bg-gray-800 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">🎯 Interview Performance</h2>
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.08)]">
+            <h2 className="font-semibold text-gray-800 mb-4">🎯 Interview Performance</h2>
 
             {/* Communication Score + STAR Coverage */}
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-700 rounded-xl p-4 text-center">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
-                  Communication Score
-                </p>
-                <p className="text-4xl font-bold text-blue-400">
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Communication Score</p>
+                <p className="text-4xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
                   {report.interview_feedback.communication_score}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">/ 100</p>
+                <p className="text-xs text-gray-400 mt-1">/ 100</p>
               </div>
-              <div className="bg-gray-700 rounded-xl p-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-                  STAR Coverage
-                </p>
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-4">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">STAR Coverage</p>
                 <div className="grid grid-cols-2 gap-1">
                   {(['situation', 'task', 'action', 'result'] as const).map((key) => (
                     <div key={key} className="flex items-center gap-1">
-                      <span
-                        className={
-                          report.interview_feedback!.star_coverage[key]
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        }
-                      >
+                      <span className={report.interview_feedback!.star_coverage[key] ? 'text-green-500' : 'text-rose-400'}>
                         {report.interview_feedback!.star_coverage[key] ? '✓' : '✗'}
                       </span>
-                      <span className="text-xs text-gray-300 capitalize">{key}</span>
+                      <span className="text-xs text-gray-600 capitalize">{key}</span>
                     </div>
                   ))}
                 </div>
@@ -384,7 +311,7 @@ export default function ReportPage() {
 
             {/* Star Feedback */}
             {report.interview_feedback.star_feedback && (
-              <div className="bg-gray-900/50 rounded-xl p-4 italic text-gray-300 text-sm mb-4">
+              <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-4 italic text-gray-600 text-sm mb-4">
                 &ldquo;{report.interview_feedback.star_feedback}&rdquo;
               </div>
             )}
@@ -392,22 +319,18 @@ export default function ReportPage() {
             {/* Strengths + Improvements */}
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <p className="text-sm font-medium text-green-400 mb-2">✅ Strengths</p>
+                <p className="text-sm font-medium text-green-600 mb-2">✅ Strengths</p>
                 <ul className="space-y-1">
                   {report.interview_feedback.strengths.map((s, i) => (
-                    <li key={i} className="text-sm text-gray-300">
-                      • {s}
-                    </li>
+                    <li key={i} className="text-sm text-gray-600">• {s}</li>
                   ))}
                 </ul>
               </div>
               <div>
-                <p className="text-sm font-medium text-orange-400 mb-2">⚠️ Areas to Improve</p>
+                <p className="text-sm font-medium text-rose-500 mb-2">⚠️ Areas to Improve</p>
                 <ul className="space-y-1">
                   {report.interview_feedback.improvements.map((s, i) => (
-                    <li key={i} className="text-sm text-gray-300">
-                      • {s}
-                    </li>
+                    <li key={i} className="text-sm text-gray-600">• {s}</li>
                   ))}
                 </ul>
               </div>
@@ -415,13 +338,9 @@ export default function ReportPage() {
 
             {/* Sample Rewrite */}
             {report.interview_feedback.sample_rewrite && (
-              <div className="border-l-4 border-indigo-500 pl-4 mt-4">
-                <p className="text-xs text-indigo-400 font-medium mb-1">
-                  💡 Try saying it like this:
-                </p>
-                <p className="text-sm text-gray-300 italic">
-                  {report.interview_feedback.sample_rewrite}
-                </p>
+              <div className="border-l-4 border-rose-300 pl-4 mt-4">
+                <p className="text-xs text-rose-400 font-medium mb-1">💡 Try saying it like this:</p>
+                <p className="text-sm text-gray-600 italic">{report.interview_feedback.sample_rewrite}</p>
               </div>
             )}
           </div>
@@ -429,12 +348,12 @@ export default function ReportPage() {
 
         {/* 9. Highlights */}
         {report.highlights?.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
             <h2 className="font-semibold text-gray-800 mb-4">Highlights</h2>
             <ul className="space-y-2">
               {report.highlights.map((h, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                  <span className="text-yellow-500 mt-0.5 flex-shrink-0">★</span>
+                  <span className="text-rose-400 mt-0.5 flex-shrink-0">★</span>
                   <span>{h}</span>
                 </li>
               ))}
@@ -446,13 +365,13 @@ export default function ReportPage() {
         <div className="flex items-center justify-center gap-4 py-4 print:hidden">
           <Link
             href="/"
-            className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm transition-colors"
+            className="inline-block px-8 py-3 bg-gradient-to-r from-rose-400 to-pink-500 text-white font-semibold rounded-xl shadow-[0_4px_16px_rgba(244,63,94,0.28)] hover:shadow-[0_6px_24px_rgba(244,63,94,0.38)] hover:scale-[1.02] transition-all duration-200"
           >
             Practice Again
           </Link>
           <button
             onClick={() => window.print()}
-            className="inline-block px-6 py-3 border border-indigo-600 text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors"
+            className="inline-block px-6 py-3 border border-rose-200 text-rose-500 bg-white hover:bg-rose-50 font-semibold rounded-xl transition-all duration-200"
           >
             🖨️ Print / Save PDF
           </button>

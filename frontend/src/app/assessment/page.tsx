@@ -1,4 +1,4 @@
-// file: src/app/assessment/page.tsx — TASK-024-FE
+// file: src/app/assessment/page.tsx — TASK-024-FE / TASK-032
 // owner: Frontend Engineer
 'use client'
 
@@ -46,7 +46,6 @@ export default function AssessmentPage() {
     }
   }, [])
 
-  // Start assessment session on mount
   useEffect(() => {
     fetch(`${API_URL}/api/assessment/start`, { method: 'POST' })
       .then((r) => {
@@ -63,25 +62,13 @@ export default function AssessmentPage() {
       })
   }, [])
 
-  // Connect WebSocket once session is ready
   useEffect(() => {
     if (!sessionId) return
-
     const ws = new WebSocket(`${WS_URL}/ws/${sessionId}`)
     wsRef.current = ws
-
-    ws.onopen = () => {
-      setWsStatus('connected')
-      setStatusText('Click mic to speak')
-    }
-    ws.onclose = () => {
-      setWsStatus('disconnected')
-      setStatusText('Disconnected from server')
-    }
-    ws.onerror = () => {
-      setWsStatus('disconnected')
-      setStatusText('Connection error — check backend')
-    }
+    ws.onopen = () => { setWsStatus('connected'); setStatusText('Click mic to speak') }
+    ws.onclose = () => { setWsStatus('disconnected'); setStatusText('Disconnected from server') }
+    ws.onerror = () => { setWsStatus('disconnected'); setStatusText('Connection error — check backend') }
     ws.onmessage = (event) => {
       try {
         const data: any = JSON.parse(event.data)
@@ -99,32 +86,23 @@ export default function AssessmentPage() {
               isCompleteRef.current = true
               setIsComplete(true)
               setStatusText('Assessment complete!')
-              setTimeout(() => {
-                router.push(`/assessment/result/${sessionId}`)
-              }, 3000)
+              setTimeout(() => router.push(`/assessment/result/${sessionId}`), 3000)
             }
             return next
           })
           if (data.ai_text && typeof window !== 'undefined' && window.speechSynthesis) {
             window.speechSynthesis.cancel()
             const utt = new SpeechSynthesisUtterance(data.ai_text)
-            utt.lang = 'en-US'
-            utt.rate = 0.9
-            utt.pitch = 1.0
+            utt.lang = 'en-US'; utt.rate = 0.9; utt.pitch = 1.0
             const voices = window.speechSynthesis.getVoices()
-            const preferred =
-              voices.find((v) => v.name === 'Google US English') ||
-              voices.find((v) => v.lang === 'en-US' && v.name.toLowerCase().includes('google')) ||
-              voices.find((v) => v.lang === 'en-US' && !v.name.toLowerCase().includes('zira')) ||
-              voices.find((v) => v.lang === 'en-US')
+            const preferred = voices.find(v => v.name === 'Google US English')
+              || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('google'))
+              || voices.find(v => v.lang === 'en-US' && !v.name.toLowerCase().includes('zira'))
+              || voices.find(v => v.lang === 'en-US')
             if (preferred) utt.voice = preferred
-            utt.onend = () => {
-              setIsSpeaking(false)
-              if (!isCompleteRef.current) setStatusText('Click mic to speak')
-            }
+            utt.onend = () => { setIsSpeaking(false); if (!isCompleteRef.current) setStatusText('Click mic to speak') }
             utt.onerror = () => setIsSpeaking(false)
-            setIsSpeaking(true)
-            setStatusText('AI is speaking...')
+            setIsSpeaking(true); setStatusText('AI is speaking...')
             window.speechSynthesis.speak(utt)
           } else {
             if (!isCompleteRef.current) setStatusText('Click mic to speak')
@@ -135,108 +113,53 @@ export default function AssessmentPage() {
             if (typeof window !== 'undefined' && window.speechSynthesis) {
               window.speechSynthesis.cancel()
               const utt = new SpeechSynthesisUtterance(data.ai_text)
-              utt.lang = 'en-US'
-              utt.rate = 0.92
+              utt.lang = 'en-US'; utt.rate = 0.92
               window.speechSynthesis.speak(utt)
             }
           }
           setStatusText('Click mic to speak')
         } else if (data.type === 'error') {
-          setIsWaiting(false)
-          setStatusText(`Server error: ${data.message}`)
+          setIsWaiting(false); setStatusText(`Server error: ${data.message}`)
         }
-      } catch {
-        // Ignore malformed messages
-      }
+      } catch { /* Ignore malformed messages */ }
     }
-
-    return () => {
-      ws.close()
-      if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
-    }
+    return () => { ws.close(); if (typeof window !== 'undefined') window.speechSynthesis?.cancel() }
   }, [sessionId, router])
 
-  const sendMessage = useCallback(
-    (text: string) => {
-      if (wsRef.current?.readyState !== WebSocket.OPEN) {
-        setStatusText('WebSocket not connected')
-        return
-      }
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'user_message',
-          text,
-          duration_ms: Date.now() - recordingStartRef.current,
-        }),
-      )
-      setIsWaiting(true)
-      setStatusText('Waiting for AI...')
-    },
-    [],
-  )
+  const sendMessage = useCallback((text: string) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) { setStatusText('WebSocket not connected'); return }
+    wsRef.current.send(JSON.stringify({ type: 'user_message', text, duration_ms: Date.now() - recordingStartRef.current }))
+    setIsWaiting(true); setStatusText('Waiting for AI...')
+  }, [])
 
   const handleMicClick = useCallback(() => {
-    if (isListening) {
-      recognitionRef.current?.stop()
-      return
-    }
+    if (isListening) { recognitionRef.current?.stop(); return }
     if (typeof window === 'undefined') return
-    const SpeechRecognitionAPI: any =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognitionAPI) {
-      setStatusText('Speech recognition not supported — please use Chrome')
-      return
-    }
+    const SpeechRecognitionAPI: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognitionAPI) { setStatusText('Speech recognition not supported — please use Chrome'); return }
     const recognition: any = new SpeechRecognitionAPI()
-    recognition.lang = 'en-US'
-    recognition.continuous = false
-    recognition.interimResults = false
+    recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
     recognitionRef.current = recognition
     let accumulatedText = ''
-    recognition.onstart = () => {
-      accumulatedText = ''
-      recordingStartRef.current = Date.now()
-      setIsListening(true)
-      setStatusText('Listening… (click to stop)')
-    }
+    recognition.onstart = () => { accumulatedText = ''; recordingStartRef.current = Date.now(); setIsListening(true); setStatusText('Listening… (click to stop)') }
     recognition.onend = () => {
       setIsListening(false)
-      const text = accumulatedText.trim()
-      accumulatedText = ''
+      const text = accumulatedText.trim(); accumulatedText = ''
       if (!text) return
-      if (/[一-鿿぀-ヿ가-힯]/.test(text)) {
-        setStatusText('Please speak in English 🇬🇧')
-        return
-      }
+      if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
       sendMessage(text)
     }
-    recognition.onerror = (e: any) => {
-      setIsListening(false)
-      accumulatedText = ''
-      if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
-    }
-    recognition.onresult = (e: any) => {
-      let text = ''
-      for (let i = 0; i < e.results.length; i++) {
-        if (e.results[i].isFinal) text += e.results[i][0].transcript
-      }
-      accumulatedText = text
-    }
-    try {
-      recognition.start()
-    } catch {
-      setStatusText('Could not start recognition')
-    }
+    recognition.onerror = (e: any) => { setIsListening(false); accumulatedText = ''; if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`) }
+    recognition.onresult = (e: any) => { let text = ''; for (let i = 0; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript } accumulatedText = text }
+    try { recognition.start() } catch { setStatusText('Could not start recognition') }
   }, [isListening, sendMessage])
 
   if (initError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <p className="text-red-500 text-sm font-semibold">Failed to start: {initError}</p>
-          <Link href="/" className="text-indigo-600 hover:underline text-sm">
-            ← Back to Home
-          </Link>
+          <p className="text-rose-500 text-sm font-semibold">Failed to start: {initError}</p>
+          <Link href="/" className="text-rose-400 hover:text-rose-500 text-sm">← Back to Home</Link>
         </div>
       </div>
     )
@@ -244,9 +167,9 @@ export default function AssessmentPage() {
 
   if (!sessionId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+          <div className="w-10 h-10 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin mx-auto" />
           <p className="text-sm text-gray-400">Preparing your speaking test...</p>
         </div>
       </div>
@@ -254,47 +177,41 @@ export default function AssessmentPage() {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-rose-50 via-white to-pink-50 flex flex-col overflow-hidden">
+      {/* 环境光晕 */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-rose-200/40 blur-[100px]" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-200/30 blur-[120px]" />
+      </div>
+
       {/* ── Header ────────────────────────────────── */}
-      <header className="bg-white border-b shadow-sm px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-gray-900">📊 Speaking Test</h1>
-          <span className="text-sm text-gray-500 font-medium">
-            Turn {turnCount} of {MAX_TURNS}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                wsStatus === 'connected'
-                  ? 'bg-green-400'
-                  : wsStatus === 'connecting'
-                  ? 'bg-yellow-400 animate-pulse'
-                  : 'bg-red-400'
-              }`}
-            />
+      <header className="bg-white/80 backdrop-blur-xl border-b border-pink-100 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
+          <h1 className="text-base font-semibold text-gray-800">📊 Speaking Test</h1>
+          <span className="text-pink-200">|</span>
+          <span className="text-sm text-gray-500">Turn {turnCount} of {MAX_TURNS}</span>
+          <div className="flex items-center gap-1.5 ml-1">
+            <div className={`w-2 h-2 rounded-full ${wsStatus === 'connected' ? 'bg-green-400' : wsStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`} />
             <span className="text-xs text-gray-400 capitalize">{wsStatus}</span>
           </div>
+          <div className="ml-auto">
+            <Link href="/" className="px-3 py-1.5 border border-rose-200 text-rose-500 bg-white hover:bg-rose-50 rounded-xl text-xs font-medium transition-all duration-200">
+              Cancel
+            </Link>
+          </div>
         </div>
-        <Link
-          href="/"
-          className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
-        >
-          Cancel
-        </Link>
       </header>
 
       {/* ── Progress bar ──────────────────────────── */}
-      <div className="bg-white border-b px-6 py-2">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+      <div className="bg-white/70 backdrop-blur-sm border-b border-pink-50 px-6 py-2">
+        <div className="flex items-center gap-2 max-w-6xl mx-auto">
+          <div className="flex-1 bg-rose-100/50 rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+              className="bg-gradient-to-r from-rose-400 to-pink-500 h-full rounded-full transition-all duration-500"
               style={{ width: `${(turnCount / MAX_TURNS) * 100}%` }}
             />
           </div>
-          <span className="text-xs text-gray-400 tabular-nums">
-            {turnCount}/{MAX_TURNS}
-          </span>
+          <span className="text-xs text-gray-400 tabular-nums">{turnCount}/{MAX_TURNS}</span>
         </div>
       </div>
 
@@ -310,28 +227,21 @@ export default function AssessmentPage() {
             </div>
           ) : (
             messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex items-end gap-2 ${
-                  msg.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
-              >
+              <div key={idx} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'ai' && (
-                  <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                     AI
                   </div>
                 )}
-                <div
-                  className={`max-w-xs lg:max-w-sm px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === 'ai'
-                      ? 'bg-blue-500 text-white rounded-bl-sm'
-                      : 'bg-green-500 text-white rounded-br-sm'
-                  }`}
-                >
+                <div className={`max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                  msg.role === 'ai'
+                    ? 'bg-white/90 border border-pink-100 text-gray-700 rounded-bl-sm shadow-[0_2px_8px_rgba(244,114,182,0.08)]'
+                    : 'bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-br-sm shadow-[0_2px_12px_rgba(244,63,94,0.2)]'
+                }`}>
                   {msg.text}
                 </div>
                 {msg.role === 'user' && (
-                  <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                     Me
                   </div>
                 )}
@@ -340,22 +250,11 @@ export default function AssessmentPage() {
           )}
           {isWaiting && (
             <div className="flex items-end gap-2 justify-start">
-              <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                AI
-              </div>
-              <div className="bg-blue-500 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5">
-                <span
-                  className="w-1.5 h-1.5 bg-white rounded-full animate-bounce"
-                  style={{ animationDelay: '0ms' }}
-                />
-                <span
-                  className="w-1.5 h-1.5 bg-white rounded-full animate-bounce"
-                  style={{ animationDelay: '150ms' }}
-                />
-                <span
-                  className="w-1.5 h-1.5 bg-white rounded-full animate-bounce"
-                  style={{ animationDelay: '300ms' }}
-                />
+              <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">AI</div>
+              <div className="bg-white/90 border border-pink-100 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5 shadow-[0_2px_8px_rgba(244,114,182,0.08)]">
+                <span className="w-1.5 h-1.5 bg-rose-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-rose-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-rose-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}
@@ -363,27 +262,24 @@ export default function AssessmentPage() {
         </div>
 
         {/* ── Mic area ──────────────────────────────── */}
-        <div className="border-t bg-white p-5 flex flex-col items-center gap-2">
+        <div className="border-t border-pink-100 bg-white/80 backdrop-blur-xl p-5 flex flex-col items-center gap-2">
           <div className="relative flex items-center justify-center">
             {isListening && (
               <>
-                <span className="absolute w-16 h-16 rounded-full bg-red-400 opacity-40 animate-ping" />
-                <span
-                  className="absolute w-20 h-20 rounded-full bg-red-300 opacity-20 animate-ping"
-                  style={{ animationDelay: '0.3s' }}
-                />
+                <span className="absolute w-16 h-16 rounded-full bg-rose-300/50 animate-ping" />
+                <span className="absolute w-20 h-20 rounded-full bg-rose-200/30 animate-ping" style={{ animationDelay: '0.3s' }} />
               </>
             )}
             <button
               onClick={handleMicClick}
               disabled={wsStatus !== 'connected' || isSpeaking || isWaiting || isComplete}
               aria-label={isListening ? 'Stop recording' : 'Start recording'}
-              className={`relative w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-150 shadow-md focus:outline-none focus:ring-4 focus:ring-offset-2 ${
+              className={`relative z-10 w-14 h-14 rounded-full flex items-center justify-center text-2xl transition-all duration-200 ${
                 isListening
-                  ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 scale-110'
+                  ? 'bg-gradient-to-r from-rose-400 to-pink-500 shadow-[0_0_32px_rgba(244,63,94,0.45)] scale-110'
                   : wsStatus !== 'connected' || isSpeaking || isWaiting || isComplete
-                  ? 'bg-gray-300 cursor-not-allowed'
-                  : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300 hover:scale-105'
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border border-gray-200'
+                  : 'bg-white border-2 border-rose-200 text-rose-400 hover:border-rose-300 shadow-[0_4px_16px_rgba(244,114,182,0.15)]'
               }`}
             >
               🎤
@@ -395,12 +291,12 @@ export default function AssessmentPage() {
 
       {/* ── Assessment complete overlay ────────────── */}
       {isComplete && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-10 text-center shadow-2xl max-w-sm mx-4">
+        <div className="absolute inset-0 bg-rose-900/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white/90 backdrop-blur-xl border border-pink-100 rounded-2xl p-10 text-center shadow-[0_8px_48px_rgba(244,114,182,0.2)] max-w-sm mx-4">
             <div className="text-6xl mb-4">🎉</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Assessment Complete!</h2>
-            <p className="text-gray-500 text-sm mb-6">Analyzing your responses...</p>
-            <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+            <p className="text-gray-400 text-sm mb-6">Analyzing your responses...</p>
+            <div className="w-8 h-8 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin mx-auto" />
             <p className="text-xs text-gray-400 mt-3">Redirecting in 3 seconds</p>
           </div>
         </div>

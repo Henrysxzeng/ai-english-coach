@@ -1,4 +1,4 @@
-// file: src/app/sde-interview/page.tsx — TASK-028
+// file: src/app/sde-interview/page.tsx — TASK-028 / TASK-031 / TASK-032
 // owner: Frontend Engineer
 'use client'
 
@@ -47,12 +47,7 @@ export default function SdeInterviewPage() {
       const res = await fetch(`${API_URL}/api/session/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scene: selectedScene,
-          difficulty,
-          resume_context: resumeContext,
-          jd_context: jdContext,
-        }),
+        body: JSON.stringify({ scene: selectedScene, difficulty, resume_context: resumeContext, jd_context: jdContext }),
       })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const data = await res.json()
@@ -65,11 +60,19 @@ export default function SdeInterviewPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 flex flex-col items-center py-12 px-4">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex flex-col items-center py-12 px-4">
+      {/* 环境光晕 */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-rose-200/40 blur-[100px]" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-200/30 blur-[120px]" />
+      </div>
+
       <div className="w-full max-w-2xl space-y-8">
         {/* Title */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">SDE Interview Practice</h1>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-rose-500 to-pink-500 bg-clip-text text-transparent mb-2">
+            SDE Interview Practice
+          </h1>
           <p className="text-gray-400">Ace your software engineering interviews</p>
         </div>
 
@@ -79,14 +82,14 @@ export default function SdeInterviewPage() {
             <button
               key={scene.id}
               onClick={() => setSelectedScene(scene.id)}
-              className={`rounded-2xl p-5 text-left transition-all ${
+              className={`rounded-2xl p-5 text-left transition-all duration-200 ${
                 selectedScene === scene.id
-                  ? 'border-2 border-blue-500 bg-blue-900/20'
-                  : 'border border-gray-600 hover:border-gray-500 bg-gray-800/50'
+                  ? 'border-2 border-rose-300 bg-rose-50/80 shadow-[0_4px_20px_rgba(244,63,94,0.12)]'
+                  : 'bg-white/80 backdrop-blur-xl border border-pink-100 shadow-[0_4px_24px_rgba(244,114,182,0.07)] hover:shadow-[0_8px_32px_rgba(244,114,182,0.12)] hover:-translate-y-0.5'
               }`}
             >
               <div className="text-3xl mb-3">{scene.icon}</div>
-              <h3 className="text-sm font-semibold text-white mb-1">{scene.title}</h3>
+              <h3 className="text-sm font-semibold text-gray-800 mb-1">{scene.title}</h3>
               <p className="text-xs text-gray-400 leading-relaxed">{scene.description}</p>
             </button>
           ))}
@@ -95,19 +98,19 @@ export default function SdeInterviewPage() {
         {/* Optional context */}
         <div className="space-y-4">
           <div>
-            <p className="text-sm font-medium text-gray-300 mb-0.5">Add Context (Optional)</p>
-            <p className="text-xs text-gray-500">Helps AI personalize interview questions</p>
+            <p className="text-sm font-medium text-gray-700 mb-0.5">Add Context (Optional)</p>
+            <p className="text-xs text-gray-400">Helps AI personalize interview questions</p>
           </div>
 
           {/* Resume textarea */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm font-medium text-gray-300">Your Resume</label>
+              <label className="text-sm font-medium text-gray-600">Your Resume</label>
               <label
-                className={`cursor-pointer text-xs px-3 py-1 rounded-lg border transition-colors ${
+                className={`cursor-pointer text-xs px-3 py-1 rounded-lg border transition-all duration-200 ${
                   isUploadingPdf
-                    ? 'border-gray-600 text-gray-500 cursor-not-allowed'
-                    : 'border-indigo-500 text-indigo-400 hover:bg-indigo-900/30'
+                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'border-rose-200 text-rose-400 hover:bg-rose-50'
                 }`}
               >
                 {isUploadingPdf ? 'Parsing...' : '📄 Upload PDF'}
@@ -124,10 +127,7 @@ export default function SdeInterviewPage() {
                     try {
                       const formData = new FormData()
                       formData.append('file', file)
-                      const resp = await fetch(
-                        `${API_URL}/api/parse-resume-pdf`,
-                        { method: 'POST', body: formData },
-                      )
+                      const resp = await fetch(`${API_URL}/api/parse-resume-pdf`, { method: 'POST', body: formData })
                       if (!resp.ok) {
                         const data = await resp.json()
                         throw new Error(data.detail || 'Failed to parse PDF')
@@ -152,9 +152,9 @@ export default function SdeInterviewPage() {
                 maxLength={2000}
                 rows={6}
                 placeholder="Paste your resume here (optional) — AI will ask relevant project questions..."
-                className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
               />
-              <span className="absolute bottom-2 right-3 text-xs text-gray-500">
+              <span className="absolute bottom-2 right-3 text-xs text-gray-400">
                 {resumeContext.length}/2000
               </span>
             </div>
@@ -162,7 +162,7 @@ export default function SdeInterviewPage() {
 
           {/* JD textarea */}
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5">
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">
               Job Description
             </label>
             <div className="relative">
@@ -172,9 +172,9 @@ export default function SdeInterviewPage() {
                 maxLength={2000}
                 rows={4}
                 placeholder="Paste job description (optional) — AI will tailor questions to the role..."
-                className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
               />
-              <span className="absolute bottom-2 right-3 text-xs text-gray-500">
+              <span className="absolute bottom-2 right-3 text-xs text-gray-400">
                 {jdContext.length}/2000
               </span>
             </div>
@@ -182,48 +182,44 @@ export default function SdeInterviewPage() {
         </div>
 
         {/* Difficulty selector */}
-        <div className="flex items-center justify-center gap-3">
-          <p className="text-sm text-gray-400 font-medium">Difficulty:</p>
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-sm text-gray-400 font-medium mr-1">Difficulty:</span>
           {(['easy', 'medium', 'hard'] as const).map((d) => (
             <button
               key={d}
               onClick={() => setDifficulty(d)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
                 difficulty === d
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                  ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-[0_2px_10px_rgba(244,63,94,0.25)]'
+                  : 'bg-white border border-pink-100 text-gray-500 hover:border-rose-200 hover:text-rose-400'
               }`}
             >
-              {d === 'easy' ? '🟢 Beginner' : d === 'medium' ? '🟡 Intermediate' : '🔴 Advanced'}
+              {d === 'easy' ? '🌸 Beginner' : d === 'medium' ? '🌺 Intermediate' : '🔥 Advanced'}
             </button>
           ))}
         </div>
 
         {/* Error banner */}
         {error && (
-          <div className="bg-red-900/50 text-red-300 rounded-xl p-3 text-sm">{error}</div>
+          <div className="bg-rose-50 border border-rose-200 text-rose-500 rounded-xl p-3 text-sm">{error}</div>
         )}
 
         {/* Start button */}
         <button
           onClick={handleStart}
           disabled={!selectedScene || isLoading}
-          className={`w-full py-3.5 rounded-xl font-semibold text-base transition-all ${
+          className={`w-full py-3.5 rounded-xl font-semibold text-base transition-all duration-200 ${
             !selectedScene || isLoading
-              ? 'bg-gray-700 text-gray-500 opacity-50 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+              : 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-[0_4px_16px_rgba(244,63,94,0.28)] hover:shadow-[0_6px_24px_rgba(244,63,94,0.38)] hover:scale-[1.02]'
           }`}
         >
-          {isLoading
-            ? 'Starting...'
-            : !selectedScene
-            ? 'Select an interview type above'
-            : 'Start Practice →'}
+          {isLoading ? 'Starting...' : !selectedScene ? 'Select an interview type above' : 'Start Practice →'}
         </button>
 
         {/* Back link */}
         <div className="text-center">
-          <Link href="/" className="text-gray-400 hover:text-gray-200 text-sm transition-colors">
+          <Link href="/" className="text-rose-400 hover:text-rose-500 text-sm transition-colors">
             ← Back to Home
           </Link>
         </div>

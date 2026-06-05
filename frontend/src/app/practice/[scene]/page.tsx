@@ -1,6 +1,5 @@
-// file: src/app/practice/[scene]/page.tsx — TASK-013
+// file: src/app/practice/[scene]/page.tsx — TASK-013 / TASK-032
 // owner: Frontend Engineer
-// version: 1.0
 'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -24,9 +23,15 @@ interface Correction {
 }
 
 const SCENE_LABELS: Record<string, string> = {
-  interview: '💼 Job Interview',
-  restaurant: '🍽️ Restaurant',
-  meeting: '📊 Business Meeting',
+  interview:        '💼 Job Interview',
+  restaurant:       '🍽️ Restaurant',
+  meeting:          '📊 Business Meeting',
+  hospital:         '🏥 Hospital Visit',
+  phone_call:       '📞 Phone Call',
+  customer_service: '🎧 Customer Service',
+  sde_behavioral:   '🗣 Behavioral',
+  sde_project:      '💼 Project Deep-Dive',
+  sde_thinking:     '🧠 Thinking & CS',
 }
 
 // ─── Inner client component that needs useSearchParams ───────────────────────
@@ -55,12 +60,10 @@ function PracticeContent({ scene }: { scene: string }) {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const recordingStartRef = useRef<number>(0)
 
-  // Auto-scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Pre-load speech synthesis voices so they're ready on first use
   useEffect(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.getVoices()
@@ -68,17 +71,12 @@ function PracticeContent({ scene }: { scene: string }) {
     }
   }, [])
 
-  // Connect WebSocket and load initial session messages
   useEffect(() => {
     if (!sessionId) return
-
-    // Fetch initial messages from session
     fetch(`${API_URL}/api/session/${sessionId}`)
       .then(r => r.json())
       .then((data) => {
-        // Backend may return `messages` or `turns` array
-        const rawMsgs: Array<{ role: string; content?: string; text?: string }> =
-          data.messages ?? data.turns ?? []
+        const rawMsgs: Array<{ role: string; content?: string; text?: string }> = data.messages ?? data.turns ?? []
         const initialMsgs: ChatMessage[] = rawMsgs.map((m) => ({
           role: m.role === 'assistant' || m.role === 'ai' ? 'ai' : 'user',
           text: m.content ?? m.text ?? '',
@@ -88,22 +86,12 @@ function PracticeContent({ scene }: { scene: string }) {
       })
       .catch(() => {})
 
-    // Open WebSocket
     const ws = new WebSocket(`${WS_URL}/ws/${sessionId}`)
     wsRef.current = ws
 
-    ws.onopen = () => {
-      setWsStatus('connected')
-      setStatusText('Click mic to speak')
-    }
-    ws.onclose = () => {
-      setWsStatus('disconnected')
-      setStatusText('Disconnected from server')
-    }
-    ws.onerror = () => {
-      setWsStatus('disconnected')
-      setStatusText('Connection error — check backend')
-    }
+    ws.onopen = () => { setWsStatus('connected'); setStatusText('Click mic to speak') }
+    ws.onclose = () => { setWsStatus('disconnected'); setStatusText('Disconnected from server') }
+    ws.onerror = () => { setWsStatus('disconnected'); setStatusText('Connection error — check backend') }
     ws.onmessage = (event) => {
       try {
         const data: any = JSON.parse(event.data)
@@ -119,223 +107,131 @@ function PracticeContent({ scene }: { scene: string }) {
           if (data.ai_text && typeof window !== 'undefined' && window.speechSynthesis) {
             window.speechSynthesis.cancel()
             const utt = new SpeechSynthesisUtterance(data.ai_text)
-            utt.lang = 'en-US'
-            utt.rate = 0.9
-            utt.pitch = 1.0
-            // Pick the best available US English voice (prefer Google US English)
+            utt.lang = 'en-US'; utt.rate = 0.9; utt.pitch = 1.0
             const voices = window.speechSynthesis.getVoices()
             const preferred = voices.find(v => v.name === 'Google US English')
               || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('google'))
               || voices.find(v => v.lang === 'en-US' && !v.name.toLowerCase().includes('zira'))
               || voices.find(v => v.lang === 'en-US')
             if (preferred) utt.voice = preferred
-            utt.onend = () => {
-              setIsSpeaking(false)
-              setStatusText('Click mic to speak')
-            }
-            utt.onerror = () => {
-              setIsSpeaking(false)
-              setStatusText('Click mic to speak')
-            }
-            setIsSpeaking(true)
-            setStatusText('AI is speaking...')
+            utt.onend = () => { setIsSpeaking(false); setStatusText('Click mic to speak') }
+            utt.onerror = () => { setIsSpeaking(false); setStatusText('Click mic to speak') }
+            setIsSpeaking(true); setStatusText('AI is speaking...')
             window.speechSynthesis.speak(utt)
           } else {
             setStatusText('Click mic to speak')
           }
         } else if (data.type === 'greeting') {
-          if (data.has_memory) {
-            setHasMemory(true)
-            setMemoryGreeting(data.ai_text ?? '')
-          }
+          if (data.has_memory) { setHasMemory(true); setMemoryGreeting(data.ai_text ?? '') }
           if (data.ai_text) {
             setMessages((prev) => [...prev, { role: 'ai', text: data.ai_text }])
-          }
-          if (data.ai_text && typeof window !== 'undefined' && window.speechSynthesis) {
-            window.speechSynthesis.cancel()
-            const utt = new SpeechSynthesisUtterance(data.ai_text)
-            utt.lang = 'en-US'
-            utt.rate = 0.92
-            window.speechSynthesis.speak(utt)
+            if (typeof window !== 'undefined' && window.speechSynthesis) {
+              window.speechSynthesis.cancel()
+              const utt = new SpeechSynthesisUtterance(data.ai_text)
+              utt.lang = 'en-US'; utt.rate = 0.92
+              window.speechSynthesis.speak(utt)
+            }
           }
           setStatusText('Click mic to speak')
         } else if (data.type === 'error') {
-          setIsWaiting(false)
-          setStatusText(`Server error: ${data.message}`)
+          setIsWaiting(false); setStatusText(`Server error: ${data.message}`)
         }
-      } catch {
-        // Ignore malformed messages
-      }
+      } catch { /* Ignore malformed messages */ }
     }
 
-    return () => {
-      ws.close()
-      if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
-    }
+    return () => { ws.close(); if (typeof window !== 'undefined') window.speechSynthesis?.cancel() }
   }, [sessionId])
 
   const sendMessage = useCallback((text: string) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) {
-      setStatusText('WebSocket not connected')
-      return
-    }
-    wsRef.current.send(JSON.stringify({
-      type: 'user_message',
-      text,
-      duration_ms: Date.now() - recordingStartRef.current,
-    }))
-    setIsWaiting(true)
-    setPendingText('')
-    setStatusText('Waiting for AI...')
+    if (wsRef.current?.readyState !== WebSocket.OPEN) { setStatusText('WebSocket not connected'); return }
+    wsRef.current.send(JSON.stringify({ type: 'user_message', text, duration_ms: Date.now() - recordingStartRef.current }))
+    setIsWaiting(true); setPendingText(''); setStatusText('Waiting for AI...')
   }, [])
 
-  // Toggle mic — starts/stops SpeechRecognition
   const handleMicClick = useCallback(() => {
-    if (isListening) {
-      recognitionRef.current?.stop()
-      return
-    }
-
+    if (isListening) { recognitionRef.current?.stop(); return }
     if (typeof window === 'undefined') return
-    const SpeechRecognitionAPI: any =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-
-    if (!SpeechRecognitionAPI) {
-      setStatusText('Speech recognition not supported — please use Chrome')
-      return
-    }
-
+    const SpeechRecognitionAPI: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognitionAPI) { setStatusText('Speech recognition not supported — please use Chrome'); return }
     const recognition: any = new SpeechRecognitionAPI()
-    recognition.lang = 'en-US'
-    recognition.continuous = false
-    recognition.interimResults = false
+    recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
     recognitionRef.current = recognition
-
-    // Accumulate transcript across multiple onresult firings (Chrome behaviour)
     let accumulatedText = ''
-
-    recognition.onstart = () => {
-      accumulatedText = ''
-      recordingStartRef.current = Date.now()
-      setIsListening(true)
-      setStatusText('Listening… (click to stop)')
-    }
+    recognition.onstart = () => { accumulatedText = ''; recordingStartRef.current = Date.now(); setIsListening(true); setStatusText('Listening… (click to stop)') }
     recognition.onend = () => {
       setIsListening(false)
-      const text = accumulatedText.trim()
-      accumulatedText = ''
+      const text = accumulatedText.trim(); accumulatedText = ''
       if (!text) return
-      // Reject non-English input (CJK characters)
-      if (/[一-鿿぀-ヿ가-힯]/.test(text)) {
-        setStatusText('Please speak in English 🇬🇧')
-        return
-      }
-      if (recordingMode === 'manual') {
-        setPendingText(text)
-        setStatusText('Review your message, then click Send ✉️')
-        return
-      }
+      if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
+      if (recordingMode === 'manual') { setPendingText(text); setStatusText('Review your message, then click Send ✉️'); return }
       sendMessage(text)
     }
-    recognition.onerror = (e: any) => {
-      setIsListening(false)
-      accumulatedText = ''
-      if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
-    }
+    recognition.onerror = (e: any) => { setIsListening(false); accumulatedText = ''; if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`) }
     recognition.onresult = (e: any) => {
-      // Collect all final results — Chrome may fire this multiple times
       let text = ''
-      for (let i = 0; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          text += e.results[i][0].transcript
-        }
-      }
+      for (let i = 0; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript }
       accumulatedText = text
     }
-
-    try {
-      recognition.start()
-    } catch {
-      setStatusText('Could not start recognition')
-    }
+    try { recognition.start() } catch { setStatusText('Could not start recognition') }
   }, [isListening, recordingMode, sendMessage])
 
   const handleEndPractice = async () => {
     if (isEnding) return
     setIsEnding(true)
-    try {
-      await fetch(`${API_URL}/api/session/${sessionId}/end`, { method: 'POST' })
-    } catch {
-      // Continue to report even if end request fails
-    }
+    try { await fetch(`${API_URL}/api/session/${sessionId}/end`, { method: 'POST' }) } catch { /* Continue even if end fails */ }
     router.push(`/report/${sessionId}`)
   }
 
   if (!sessionId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <p className="text-red-500 text-sm font-semibold">Invalid session</p>
-          <Link href="/" className="text-indigo-600 hover:underline text-sm">
-            ← Back to Home
-          </Link>
+          <p className="text-rose-500 text-sm font-semibold">Invalid session</p>
+          <Link href="/" className="text-rose-400 hover:text-rose-500 text-sm">← Back to Home</Link>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-rose-50 via-white to-pink-50 flex flex-col overflow-hidden">
+      {/* 环境光晕 */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-rose-200/40 blur-[100px]" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-200/30 blur-[120px]" />
+      </div>
+
       {/* ── Header ────────────────────────────────── */}
-      <header className="bg-white border-b shadow-sm px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-gray-900">
-            {SCENE_LABELS[scene] ?? scene}
-          </h1>
+      <header className="bg-white/80 backdrop-blur-xl border-b border-pink-100 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
+          <Link href="/" className="text-gray-400 hover:text-rose-400 transition-colors text-sm">← Home</Link>
+          <span className="text-pink-200">|</span>
+          <span className="text-gray-700 font-medium text-sm">{SCENE_LABELS[scene] ?? scene}</span>
           {difficulty && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              difficulty === 'easy'
-                ? 'bg-green-100 text-green-600'
-                : difficulty === 'hard'
-                ? 'bg-red-100 text-red-600'
-                : 'bg-yellow-100 text-yellow-600'
-            }`}>
+            <span className="bg-rose-50 text-rose-500 border border-rose-200 rounded-full px-3 py-0.5 text-xs font-medium">
               {difficulty === 'easy' ? 'Beginner' : difficulty === 'hard' ? 'Advanced' : 'Intermediate'}
             </span>
           )}
-          <div className="flex items-center gap-1.5">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                wsStatus === 'connected'
-                  ? 'bg-green-400'
-                  : wsStatus === 'connecting'
-                  ? 'bg-yellow-400 animate-pulse'
-                  : 'bg-red-400'
-              }`}
-            />
+          <div className="flex items-center gap-1.5 ml-1">
+            <div className={`w-2 h-2 rounded-full ${wsStatus === 'connected' ? 'bg-green-400' : wsStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'}`} />
             <span className="text-xs text-gray-400 capitalize">{wsStatus}</span>
           </div>
+          <button
+            onClick={handleEndPractice}
+            disabled={isEnding}
+            className="ml-auto px-4 py-1.5 border border-rose-200 text-rose-500 bg-white hover:bg-rose-50 text-sm font-medium rounded-xl transition-all duration-200 disabled:opacity-50"
+          >
+            {isEnding ? 'Ending…' : 'End Practice'}
+          </button>
         </div>
-        <button
-          onClick={handleEndPractice}
-          disabled={isEnding}
-          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
-        >
-          {isEnding ? 'Ending…' : 'End Practice'}
-        </button>
       </header>
 
       {/* ── Memory banner ─────────────────────────── */}
       {hasMemory && (
-        <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-2 flex items-center gap-2 text-sm text-indigo-700">
+        <div className="bg-rose-50 border-b border-rose-100 px-6 py-2 flex items-center gap-2 text-sm text-rose-500">
           <span>🧠</span>
           <span>AI remembered your last session and will focus on your weak areas today</span>
-          <button
-            onClick={() => setHasMemory(false)}
-            className="ml-auto text-indigo-400 hover:text-indigo-600"
-          >
-            ✕
-          </button>
+          <button onClick={() => setHasMemory(false)} className="ml-auto text-rose-300 hover:text-rose-500">✕</button>
         </div>
       )}
 
@@ -353,41 +249,30 @@ function PracticeContent({ scene }: { scene: string }) {
               </div>
             ) : (
               messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+                <div key={idx} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {msg.role === 'ai' && (
-                    <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      AI
-                    </div>
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">AI</div>
                   )}
-                  <div
-                    className={`max-w-xs lg:max-w-sm px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                      msg.role === 'ai'
-                        ? 'bg-blue-500 text-white rounded-bl-sm'
-                        : 'bg-green-500 text-white rounded-br-sm'
-                    }`}
-                  >
+                  <div className={`max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'ai'
+                      ? 'bg-white/90 border border-pink-100 text-gray-700 rounded-bl-sm shadow-[0_2px_8px_rgba(244,114,182,0.08)]'
+                      : 'bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-br-sm shadow-[0_2px_12px_rgba(244,63,94,0.2)]'
+                  }`}>
                     {msg.text}
                   </div>
                   {msg.role === 'user' && (
-                    <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      Me
-                    </div>
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">Me</div>
                   )}
                 </div>
               ))
             )}
             {isWaiting && (
               <div className="flex items-end gap-2 justify-start">
-                <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  AI
-                </div>
-                <div className="bg-blue-500 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">AI</div>
+                <div className="bg-white/90 border border-pink-100 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5 shadow-[0_2px_8px_rgba(244,114,182,0.08)]">
+                  <span className="w-1.5 h-1.5 bg-rose-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-rose-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-rose-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
             )}
@@ -395,42 +280,38 @@ function PracticeContent({ scene }: { scene: string }) {
           </div>
 
           {/* Mic button area */}
-          <div className="border-t bg-white p-5 flex flex-col items-center gap-2">
+          <div className="border-t border-pink-100 bg-white/80 backdrop-blur-xl p-5 flex flex-col items-center gap-2">
             {/* Recording mode toggle */}
             <div className="flex items-center gap-2 text-xs text-gray-400">
               <button
                 onClick={() => setRecordingMode('auto')}
-                className={`px-2 py-1 rounded ${recordingMode === 'auto' ? 'bg-indigo-100 text-indigo-600 font-semibold' : 'hover:bg-gray-100'}`}
-              >
-                Auto
-              </button>
+                className={`px-2 py-1 rounded ${recordingMode === 'auto' ? 'bg-rose-50 text-rose-500 font-semibold border border-rose-200' : 'hover:bg-gray-50'}`}
+              >Auto</button>
               <span>/</span>
               <button
                 onClick={() => setRecordingMode('manual')}
-                className={`px-2 py-1 rounded ${recordingMode === 'manual' ? 'bg-indigo-100 text-indigo-600 font-semibold' : 'hover:bg-gray-100'}`}
-              >
-                Manual
-              </button>
+                className={`px-2 py-1 rounded ${recordingMode === 'manual' ? 'bg-rose-50 text-rose-500 font-semibold border border-rose-200' : 'hover:bg-gray-50'}`}
+              >Manual</button>
             </div>
 
             {/* Mic button with sound-wave rings */}
             <div className="relative flex items-center justify-center">
               {isListening && (
                 <>
-                  <span className="absolute w-16 h-16 rounded-full bg-red-400 opacity-40 animate-ping" />
-                  <span className="absolute w-20 h-20 rounded-full bg-red-300 opacity-20 animate-ping" style={{ animationDelay: '0.3s' }} />
+                  <span className="absolute w-16 h-16 rounded-full bg-rose-300/50 animate-ping" />
+                  <span className="absolute w-20 h-20 rounded-full bg-rose-200/30 animate-ping" style={{ animationDelay: '0.3s' }} />
                 </>
               )}
               <button
                 onClick={handleMicClick}
                 disabled={wsStatus !== 'connected' || isSpeaking || isWaiting}
                 aria-label={isListening ? 'Stop recording' : 'Start recording'}
-                className={`relative w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all duration-150 shadow-md focus:outline-none focus:ring-4 focus:ring-offset-2 ${
+                className={`relative z-10 w-14 h-14 rounded-full flex items-center justify-center text-2xl transition-all duration-200 ${
                   isListening
-                    ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 scale-110'
+                    ? 'bg-gradient-to-r from-rose-400 to-pink-500 shadow-[0_0_32px_rgba(244,63,94,0.45)] scale-110'
                     : wsStatus !== 'connected' || isSpeaking || isWaiting
-                    ? 'bg-gray-300 cursor-not-allowed'
-                    : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300 hover:scale-105'
+                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed border border-gray-200'
+                    : 'bg-white border-2 border-rose-200 text-rose-400 hover:border-rose-300 shadow-[0_4px_16px_rgba(244,114,182,0.15)]'
                 }`}
               >
                 🎤
@@ -440,12 +321,12 @@ function PracticeContent({ scene }: { scene: string }) {
             {/* Pending message + Send button (manual mode) */}
             {pendingText && recordingMode === 'manual' && (
               <div className="flex items-center gap-2 max-w-xs w-full mt-1">
-                <p className="text-xs text-gray-600 flex-1 truncate bg-gray-50 rounded-lg px-3 py-1.5 border">
+                <p className="text-xs text-gray-600 flex-1 truncate bg-rose-50 rounded-lg px-3 py-1.5 border border-rose-100">
                   {pendingText}
                 </p>
                 <button
                   onClick={() => sendMessage(pendingText)}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg whitespace-nowrap"
+                  className="px-3 py-1.5 bg-gradient-to-r from-rose-400 to-pink-500 text-white text-xs font-semibold rounded-lg shadow-[0_2px_8px_rgba(244,63,94,0.2)] whitespace-nowrap"
                 >
                   Send ✉️
                 </button>
@@ -464,11 +345,10 @@ function PracticeContent({ scene }: { scene: string }) {
                       text: "[HINT REQUEST] I'm not sure what to say next. Please give me a simple hint or a starter phrase I can use.",
                       duration_ms: 0,
                     }))
-                    setIsWaiting(true)
-                    setStatusText('Getting hint...')
+                    setIsWaiting(true); setStatusText('Getting hint...')
                   }
                 }}
-                className="text-xs text-indigo-400 hover:text-indigo-600 underline mt-1"
+                className="text-xs text-rose-400 hover:text-rose-500 underline mt-1"
               >
                 💡 Need a hint?
               </button>
@@ -477,36 +357,28 @@ function PracticeContent({ scene }: { scene: string }) {
         </div>
 
         {/* Right: Correction panel */}
-        <div className="w-72 border-l bg-white flex flex-col flex-shrink-0">
-          <div className="px-4 py-3 border-b">
+        <div className="w-72 border-l border-pink-100 bg-white/70 backdrop-blur-xl flex flex-col flex-shrink-0">
+          <div className="px-4 py-3 border-b border-pink-100">
             <h2 className="text-sm font-semibold text-gray-600">Grammar Check</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             {correction && correction.has_error ? (
               <div className="space-y-3">
-                <div className="rounded-xl bg-red-50 border border-red-200 p-3">
-                  <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-1.5">
-                    Original
-                  </p>
-                  <p className="text-sm text-red-700">&ldquo;{correction.original}&rdquo;</p>
+                <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-rose-400 uppercase tracking-wide mb-1.5">Original</p>
+                  <p className="text-sm text-gray-600">&ldquo;{correction.original}&rdquo;</p>
                 </div>
-                <div className="text-center text-gray-300 text-xl">↓</div>
-                <div className="rounded-xl bg-green-50 border border-green-200 p-3">
-                  <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1.5">
-                    Corrected
-                  </p>
-                  <p className="text-sm text-green-700 font-medium">
-                    &ldquo;{correction.corrected}&rdquo;
-                  </p>
+                <div className="text-center text-rose-200 text-xl">↓</div>
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1.5">Corrected</p>
+                  <p className="text-sm text-gray-700 font-medium">&ldquo;{correction.corrected}&rdquo;</p>
                 </div>
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
-                  <p className="text-xs font-semibold text-amber-500 uppercase tracking-wide mb-1.5">
-                    Explanation
-                  </p>
-                  <p className="text-sm text-amber-800 leading-relaxed">{correction.explanation}</p>
+                <div className="bg-white border border-pink-100 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-rose-400 uppercase tracking-wide mb-1.5">Explanation</p>
+                  <p className="text-sm text-gray-600 leading-relaxed">{correction.explanation}</p>
                 </div>
                 {correction.error_type && (
-                  <span className="inline-block px-2.5 py-1 bg-indigo-100 text-indigo-600 text-xs font-medium rounded-full capitalize">
+                  <span className="inline-block bg-rose-50 text-rose-500 border border-rose-200 rounded-full px-2.5 py-1 text-xs font-medium capitalize">
                     {correction.error_type}
                   </span>
                 )}
@@ -528,8 +400,8 @@ function PracticeContent({ scene }: { scene: string }) {
 
 function LoadingSpinner() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin" />
     </div>
   )
 }

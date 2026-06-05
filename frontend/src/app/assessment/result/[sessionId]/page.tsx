@@ -1,4 +1,4 @@
-// file: src/app/assessment/result/[sessionId]/page.tsx — TASK-024-FE
+// file: src/app/assessment/result/[sessionId]/page.tsx — TASK-024-FE / TASK-032
 // owner: Frontend Engineer
 'use client'
 
@@ -15,13 +15,6 @@ interface AssessmentResult {
   strengths: string[]
   areas_to_improve: string[]
   recommended_difficulty: string
-}
-
-const LEVEL_COLORS: Record<string, { bg: string; text: string; ring: string }> = {
-  A2: { bg: 'bg-red-50',    text: 'text-red-600',    ring: 'ring-red-300' },
-  B1: { bg: 'bg-yellow-50', text: 'text-yellow-600', ring: 'ring-yellow-300' },
-  B2: { bg: 'bg-blue-50',   text: 'text-blue-600',   ring: 'ring-blue-300' },
-  C1: { bg: 'bg-green-50',  text: 'text-green-600',  ring: 'ring-green-300' },
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -48,12 +41,10 @@ export default function AssessmentResultPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <p className="text-red-500 text-sm">Failed to load result: {error}</p>
-          <Link href="/" className="text-indigo-600 hover:underline text-sm">
-            ← Back to Home
-          </Link>
+          <p className="text-rose-500 text-sm">Failed to load result: {error}</p>
+          <Link href="/" className="text-rose-400 hover:text-rose-500 text-sm">← Back to Home</Link>
         </div>
       </div>
     )
@@ -61,41 +52,43 @@ export default function AssessmentResultPage() {
 
   if (!result) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+          <div className="w-10 h-10 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin mx-auto" />
           <p className="text-sm text-gray-400">Calculating your level...</p>
         </div>
       </div>
     )
   }
 
-  const colors = LEVEL_COLORS[result.cefr_level] ?? LEVEL_COLORS['B1']
-  const diffLabel =
-    DIFFICULTY_LABEL[result.recommended_difficulty] ?? result.recommended_difficulty
+  const diffLabel = DIFFICULTY_LABEL[result.recommended_difficulty] ?? result.recommended_difficulty
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-10 px-4">
+    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 py-10 px-4">
+      {/* 环境光晕 */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-rose-200/40 blur-[100px]" />
+        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-200/30 blur-[120px]" />
+      </div>
+
       <div className="max-w-lg mx-auto space-y-6">
         {/* Title */}
         <div className="text-center">
           <p className="text-sm text-gray-400 mb-2">Speaking Test Result</p>
-          <h1 className="text-3xl font-bold text-gray-900">Your CEFR Level</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Your CEFR Level</h1>
         </div>
 
         {/* CEFR level card */}
-        <div
-          className={`${colors.bg} rounded-2xl p-10 text-center shadow-sm ring-4 ${colors.ring}`}
-        >
-          <div className={`text-8xl font-black ${colors.text} mb-2 tracking-tight`}>
+        <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-10 text-center shadow-[0_4px_24px_rgba(244,114,182,0.08)]">
+          <div className="text-7xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent mb-2 tracking-tight">
             {result.cefr_level}
           </div>
-          <div className={`text-xl font-semibold ${colors.text}`}>{result.level_label}</div>
+          <div className="text-xl font-semibold text-gray-600">{result.level_label}</div>
         </div>
 
         {/* Recommended level */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-xl flex-shrink-0">
+        <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-5 shadow-[0_4px_24px_rgba(244,114,182,0.07)] flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-xl flex-shrink-0">
             🎯
           </div>
           <div>
@@ -108,31 +101,31 @@ export default function AssessmentResultPage() {
 
         {/* Strengths */}
         {result.strengths?.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
             <h2 className="font-semibold text-gray-800 mb-4">Strengths</h2>
-            <ul className="space-y-2">
+            <div className="bg-green-50 border border-green-100 rounded-xl p-4 space-y-2">
               {result.strengths.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
                   <span className="text-green-500 mt-0.5 flex-shrink-0">✅</span>
                   <span>{s}</span>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 
         {/* Areas to improve */}
         {result.areas_to_improve?.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
             <h2 className="font-semibold text-gray-800 mb-4">Areas to Improve</h2>
-            <ul className="space-y-2">
+            <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 space-y-2">
               {result.areas_to_improve.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                  <span className="text-indigo-500 mt-0.5 flex-shrink-0">📈</span>
+                <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                  <span className="text-rose-400 mt-0.5 flex-shrink-0">📈</span>
                   <span>{s}</span>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 
@@ -140,7 +133,7 @@ export default function AssessmentResultPage() {
         <div className="text-center py-4">
           <Link
             href="/"
-            className="inline-block px-10 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm transition-colors text-base"
+            className="inline-block px-10 py-3 bg-gradient-to-r from-rose-400 to-pink-500 text-white font-semibold rounded-xl shadow-[0_4px_16px_rgba(244,63,94,0.28)] hover:shadow-[0_6px_24px_rgba(244,63,94,0.38)] hover:scale-[1.02] transition-all duration-200"
           >
             Start Practicing →
           </Link>

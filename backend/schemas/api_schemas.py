@@ -6,6 +6,8 @@ from typing import Optional, List, Any
 class SessionCreate(BaseModel):
     scene: str  # interview | restaurant | meeting
     difficulty: str = "medium"
+    resume_context: str = ""
+    jd_context: str = ""
 
 
 class SessionResponse(BaseModel):
@@ -14,6 +16,8 @@ class SessionResponse(BaseModel):
     system_prompt: str
     created_at: str
     difficulty: str = "medium"
+    resume_context: str = ""
+    jd_context: str = ""
     previous_analysis: Optional[Any] = None
 
 

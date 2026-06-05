@@ -20,7 +20,9 @@ async def init_db():
                 created_at TEXT NOT NULL,
                 ended_at TEXT,
                 difficulty TEXT DEFAULT 'medium',
-                cefr_level TEXT DEFAULT NULL
+                cefr_level TEXT DEFAULT NULL,
+                resume_context TEXT DEFAULT '',
+                jd_context TEXT DEFAULT ''
             )
         """)
         await db.execute("""
@@ -77,6 +79,16 @@ async def init_db():
             pass
         try:
             await db.execute("ALTER TABLE sessions ADD COLUMN cefr_level TEXT DEFAULT NULL")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE sessions ADD COLUMN resume_context TEXT DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE sessions ADD COLUMN jd_context TEXT DEFAULT ''")
             await db.commit()
         except Exception:
             pass

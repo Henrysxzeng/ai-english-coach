@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 import aiosqlite
 from dotenv import load_dotenv
-from services.llm_service import generate_report_scores
+from services.llm_service import generate_report_scores, generate_interview_feedback
 
 FILLER_RE = r'\b(um+|uh+|hmm+|like|you know|sort of|kind of|basically|literally|i mean)\b'
 
@@ -91,9 +91,19 @@ async def get_report(session_id: str):
             "wpm_context": wpm_context,
             "filler_count": 0,
             "filler_words": [],
+            "interview_feedback": None,
         }
 
     scores = await generate_report_scores(session_id, messages, corrections_raw)
+
+    interview_feedback = None
+    if session["scene"].startswith("sde_"):
+        resume_ctx = session["resume_context"] or ""
+        jd_ctx = session["jd_context"] or ""
+        try:
+            interview_feedback = await generate_interview_feedback(messages, resume_ctx, jd_ctx)
+        except Exception:
+            interview_feedback = None
 
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
@@ -129,4 +139,5 @@ async def get_report(session_id: str):
         "wpm_context": wpm_context,
         "filler_count": filler_count,
         "filler_words": filler_words,
+        "interview_feedback": interview_feedback,
     }

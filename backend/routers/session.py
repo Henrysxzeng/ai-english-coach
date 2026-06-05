@@ -21,6 +21,9 @@ SCENE_OPENERS = {
     "phone_call": "Hello! Thank you for calling. How can I help you today?",
     "customer_service": "Thank you for calling customer support. My name is Alex. How can I assist you today?",
     "assessment": "Welcome to the speaking assessment! I'll ask you a few questions to understand your English level. Let's start: could you please tell me a bit about yourself and your English learning journey?",
+    "sde_behavioral": "Welcome! Let's get started with some behavioral questions. Could you begin by telling me about yourself and what drew you to software engineering?",
+    "sde_project": "Thanks for joining! I'd love to dive into your technical background. Could you walk me through a recent project you're most proud of — what it did and your role in it?",
+    "sde_thinking": "Great, let's begin! I'll ask questions to explore your technical reasoning. First — can you explain the difference between a stack and a queue, and describe a scenario where you'd choose one over the other?",
 }
 
 VALID_SCENES = set(SCENE_OPENERS.keys())
@@ -35,12 +38,14 @@ async def create_session(data: SessionCreate):
     now = datetime.now(timezone.utc).isoformat()
     opener = SCENE_OPENERS[data.scene]
     difficulty = data.difficulty if data.difficulty in ("easy", "medium", "hard") else "medium"
+    resume_context = data.resume_context or ""
+    jd_context = data.jd_context or ""
 
     previous_analysis = None
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO sessions (id, scene, status, created_at, difficulty) VALUES (?, ?, 'active', ?, ?)",
-            (session_id, data.scene, now, difficulty),
+            "INSERT INTO sessions (id, scene, status, created_at, difficulty, resume_context, jd_context) VALUES (?, ?, 'active', ?, ?, ?, ?)",
+            (session_id, data.scene, now, difficulty, resume_context, jd_context),
         )
         await db.execute(
             "INSERT INTO messages (session_id, role, content, turn_id, created_at) VALUES (?, 'assistant', ?, 0, ?)",
@@ -72,6 +77,8 @@ async def create_session(data: SessionCreate):
         system_prompt=opener,
         created_at=now,
         difficulty=difficulty,
+        resume_context=resume_context,
+        jd_context=jd_context,
         previous_analysis=previous_analysis,
     )
 
@@ -94,6 +101,9 @@ async def get_session(session_id: str):
         "session_id": session_id,
         "scene": session["scene"],
         "status": session["status"],
+        "difficulty": session["difficulty"],
+        "resume_context": session["resume_context"] or "",
+        "jd_context": session["jd_context"] or "",
         "messages": messages,
         "created_at": session["created_at"],
     }

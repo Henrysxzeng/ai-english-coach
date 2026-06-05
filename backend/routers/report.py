@@ -44,6 +44,23 @@ async def get_report(session_id: str):
             pass
 
     user_turns = sum(1 for m in messages if m["role"] == "user")
+
+    if user_turns == 0:
+        return {
+            "session_id": session_id,
+            "scene": session["scene"],
+            "duration_seconds": duration,
+            "total_turns": 0,
+            "pronunciation_score": 0.0,
+            "grammar_errors": 0,
+            "fluency_score": 0.0,
+            "vocabulary_score": 0.0,
+            "overall_score": 0.0,
+            "corrections": [],
+            "suggestions": ["Please complete at least one conversation turn"],
+            "highlights": [],
+        }
+
     scores = await generate_report_scores(session_id, messages, corrections_raw)
 
     return {

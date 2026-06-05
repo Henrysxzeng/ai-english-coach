@@ -1,4 +1,4 @@
-# routers/ws.py | backend | v1.1
+# routers/ws.py | backend | v1.2
 import os
 import json
 import asyncio
@@ -12,6 +12,7 @@ load_dotenv()
 
 router = APIRouter(tags=["websocket"])
 DB_PATH = os.getenv("DATABASE_URL", "./data/coach.db")
+AI_RESPONSE_TIMEOUT = 15
 
 
 @router.websocket("/ws/{session_id}")
@@ -20,11 +21,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        cursor = await db.execute("SELECT scene FROM sessions WHERE id = ?", (session_id,))
+        cursor = await db.execute("SELECT scene, status FROM sessions WHERE id = ?", (session_id,))
         session = await cursor.fetchone()
 
     if not session:
         await websocket.send_json({"type": "error", "message": "Session not found"})
+        await websocket.close()
+        return
+
+    if session["status"] == "ended":
+        await websocket.send_json({"type": "error", "message": "Session already ended"})
         await websocket.close()
         return
 
@@ -60,14 +66,31 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             messages = history + [{"role": "user", "content": user_text}]
 
-            # Parallel: correction + AI response
-            correction, ai_text = await asyncio.gather(
-                evaluate_correction(user_text),
-                get_ai_response(scene, messages),
-            )
+            # Parallel: correction + AI response, with timeout
+            try:
+                correction, ai_text = await asyncio.wait_for(
+                    asyncio.gather(
+                        evaluate_correction(user_text),
+                        get_ai_response(scene, messages),
+                    ),
+                    timeout=AI_RESPONSE_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "AI response timed out, please try again",
+                })
+                continue
 
-            # Persist
+            # Verify session still exists, then persist
             async with aiosqlite.connect(DB_PATH) as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute("SELECT id FROM sessions WHERE id = ?", (session_id,))
+                if not await cursor.fetchone():
+                    await websocket.send_json({"type": "error", "message": "Session no longer exists"})
+                    await websocket.close()
+                    return
+
                 await db.execute(
                     "INSERT INTO messages (session_id, role, content, turn_id, created_at) VALUES (?, 'user', ?, ?, ?)",
                     (session_id, user_text, turn_id, now),

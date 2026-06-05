@@ -69,6 +69,30 @@ SCENE_PROMPTS = {
         "Then ask 2-3 natural follow-up questions based on their answers. "
         "Be warm and encouraging. Keep each response under 2 sentences."
     ),
+    "sde_behavioral": (
+        "You are a Senior Software Engineer interviewer at a top US tech company conducting a behavioral interview. "
+        "Use the STAR framework (Situation, Task, Action, Result) to evaluate answers. "
+        "Ask ONE behavioral question at a time. Topics: teamwork, conflict resolution, failure/learning, leadership, time pressure. "
+        "If candidate context is provided, reference it to make questions more personalized. "
+        "After each answer, ask ONE brief follow-up (e.g. 'What would you do differently?'). "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "sde_project": (
+        "You are a technical interviewer conducting a project deep-dive interview. "
+        "Ask the candidate about architecture decisions, technology choices, trade-offs, and hard problems they solved. "
+        "One question at a time. React briefly to their answer (1 sentence), then probe deeper. "
+        "If a resume is provided, ask specifically about the projects listed. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "sde_thinking": (
+        "You are a CS fundamentals interviewer assessing conceptual knowledge — no coding required. "
+        "Ask about system design concepts, data structure trade-offs, distributed systems basics, or scalability thinking. "
+        "Keep questions conversational — you want to understand how they think, not test memorization. "
+        "One question at a time. Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
 }
 
 DIFFICULTY_SUFFIX = {
@@ -88,8 +112,21 @@ EMPTY_CORRECTION = {
 VALID_WEAK_AREAS = {"grammar", "clarity", "structure", "vocabulary", "response_completeness"}
 
 
-async def get_ai_response(scene: str, messages: list[dict], difficulty: str = "medium") -> str:
+async def get_ai_response(
+    scene: str,
+    messages: list[dict],
+    difficulty: str = "medium",
+    resume_context: str = "",
+    jd_context: str = "",
+) -> str:
     system_prompt = SCENE_PROMPTS.get(scene, SCENE_PROMPTS["interview"]) + DIFFICULTY_SUFFIX.get(difficulty, "")
+    context_parts = []
+    if resume_context:
+        context_parts.append(f"Resume: {resume_context}")
+    if jd_context:
+        context_parts.append(f"Job Description: {jd_context}")
+    if context_parts:
+        system_prompt += "\n\n[Candidate Context]\n" + "\n".join(context_parts) + "\nUse this context to make your questions more personalized and relevant."
     response = await client.chat.completions.create(
         model="deepseek-chat",
         messages=[{"role": "system", "content": system_prompt}] + messages,
@@ -401,6 +438,74 @@ async def generate_assessment_result(messages: list[dict]) -> dict:
             "strengths": ["Willing to practice English"],
             "areas_to_improve": ["Work on grammar accuracy"],
             "recommended_difficulty": "medium",
+        }
+
+
+async def generate_interview_feedback(
+    messages: list[dict],
+    resume_context: str = "",
+    jd_context: str = "",
+) -> dict:
+    user_messages = [m["content"] for m in messages if m["role"] == "user"]
+    if len(user_messages) < 2:
+        return {
+            "communication_score": 0,
+            "star_coverage": {"situation": False, "task": False, "action": False, "result": False},
+            "star_feedback": "Not enough conversation to evaluate.",
+            "strengths": [],
+            "improvements": ["Complete at least 2 turns to receive feedback."],
+            "sample_rewrite": "",
+        }
+
+    conversation = "\n".join(f"Candidate: {m}" for m in user_messages)
+    context_note = ""
+    if resume_context:
+        context_note += f"\nResume provided: {resume_context[:500]}"
+    if jd_context:
+        context_note += f"\nJob Description: {jd_context[:300]}"
+
+    prompt = (
+        f"You are an interview coach evaluating a software engineer's behavioral interview answers.{context_note}\n\n"
+        f"Conversation:\n{conversation}\n\n"
+        "Analyze the candidate's answers and reply ONLY with a JSON object:\n"
+        '{"communication_score": <int 0-100>, '
+        '"star_coverage": {"situation": <bool>, "task": <bool>, "action": <bool>, "result": <bool>}, '
+        '"star_feedback": "<1-2 sentences on STAR quality>", '
+        '"strengths": ["<str>", "<str>"], '
+        '"improvements": ["<str>", "<str>"], '
+        '"sample_rewrite": "<suggested rewrite of the weakest answer>"}\n\n'
+        "communication_score: 0-100 based on clarity, structure, and conciseness.\n"
+        "star_coverage: true if the candidate clearly addressed each element across their answers.\n"
+        "Output only the JSON, no other text."
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=600,
+            temperature=0.2,
+        )
+        text = response.choices[0].message.content.strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
+        result.setdefault("communication_score", 60)
+        result.setdefault("star_coverage", {"situation": False, "task": False, "action": False, "result": False})
+        result.setdefault("star_feedback", "")
+        result.setdefault("strengths", [])
+        result.setdefault("improvements", [])
+        result.setdefault("sample_rewrite", "")
+        return result
+    except Exception:
+        return {
+            "communication_score": 60,
+            "star_coverage": {"situation": True, "task": True, "action": True, "result": False},
+            "star_feedback": "Good effort. Try to quantify your results more clearly.",
+            "strengths": ["Clear communication"],
+            "improvements": ["Add quantifiable results to your answers"],
+            "sample_rewrite": "",
         }
 
 

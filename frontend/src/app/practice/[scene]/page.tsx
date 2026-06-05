@@ -48,7 +48,6 @@ function PracticeContent({ scene }: { scene: string }) {
   const [memoryGreeting, setMemoryGreeting] = useState('')
 
   const wsRef = useRef<WebSocket | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -102,7 +101,6 @@ function PracticeContent({ scene }: { scene: string }) {
     }
     ws.onmessage = (event) => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = JSON.parse(event.data)
         if (data.type === 'response') {
           setIsWaiting(false)
@@ -179,9 +177,7 @@ function PracticeContent({ scene }: { scene: string }) {
     }
 
     if (typeof window === 'undefined') return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognitionAPI: any =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 
     if (!SpeechRecognitionAPI) {
@@ -189,7 +185,6 @@ function PracticeContent({ scene }: { scene: string }) {
       return
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognition: any = new SpeechRecognitionAPI()
     recognition.lang = 'en-US'
     recognition.continuous = false
@@ -222,13 +217,11 @@ function PracticeContent({ scene }: { scene: string }) {
         setStatusText('WebSocket not connected')
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onerror = (e: any) => {
       setIsListening(false)
       accumulatedText = ''
       if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (e: any) => {
       // Collect all final results — Chrome may fire this multiple times
       let text = ''

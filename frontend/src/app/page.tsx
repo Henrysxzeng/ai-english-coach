@@ -1,5 +1,4 @@
-// file: src/app/page.tsx — TASK-012/018/021/023/028/032
-// owner: Frontend Engineer
+// file: src/app/page.tsx — TASK-035 sidebar layout + real glassmorphism
 'use client'
 
 import { useState } from 'react'
@@ -13,209 +12,250 @@ const SCENES = [
     id: 'interview',
     icon: '💼',
     title: 'Job Interview',
-    subtitle: '面试练习',
-    description: 'Practice with a professional HR interviewer at a top tech company.',
+    desc: 'Practice with a professional HR interviewer. Get grilled on your experience, strengths, and situational questions.',
+    tips: ['Use STAR method for behavioral questions', 'Speak at a steady pace', 'Ask thoughtful questions at the end'],
   },
   {
     id: 'restaurant',
     icon: '🍽️',
-    title: 'Restaurant Ordering',
-    subtitle: '餐厅点餐',
-    description: 'Order food and chat naturally with a friendly English waiter.',
+    title: 'Restaurant',
+    desc: 'Order food and have natural conversations with a friendly English-speaking waiter.',
+    tips: ['Practice polite requests', 'Learn food vocabulary', 'Handle dietary restrictions'],
   },
   {
     id: 'meeting',
     icon: '📊',
     title: 'Business Meeting',
-    subtitle: '商务会议',
-    description: 'Discuss project updates and share ideas in a team meeting.',
+    desc: 'Discuss project updates, share ideas, and present your views confidently in a team meeting.',
+    tips: ['Use transition phrases', 'Practice interrupting politely', 'Summarize action items'],
   },
   {
     id: 'hospital',
     icon: '🏥',
     title: 'Hospital Visit',
-    subtitle: '医院就诊',
-    description: 'Talk to a doctor about your symptoms and treatment options.',
+    desc: 'Describe your symptoms, ask the doctor questions, and understand medical instructions in English.',
+    tips: ['Describe symptoms precisely', 'Ask about side effects', 'Confirm follow-up steps'],
   },
   {
     id: 'phone_call',
     icon: '📞',
     title: 'Phone Call',
-    subtitle: '电话沟通',
-    description: 'Handle a business or personal call with confidence.',
+    desc: 'Handle business or personal calls with confidence — without seeing the other person.',
+    tips: ['Speak clearly and slowly', 'Confirm spellings phonetically', 'Practice hold phrases'],
   },
   {
     id: 'customer_service',
     icon: '🎧',
     title: 'Customer Service',
-    subtitle: '客户服务',
-    description: 'Resolve complaints or answer questions professionally.',
+    desc: 'Resolve complaints, answer questions, and de-escalate difficult situations professionally.',
+    tips: ['Empathize before solving', 'Use solution-focused language', 'Stay calm under pressure'],
   },
 ]
 
 const HOW_TO_USE = [
-  { step: 1, icon: '🎭', title: 'Choose a Scene',       description: 'Pick a real-life practice scenario' },
-  { step: 2, icon: '🎤', title: 'Start Speaking',       description: 'Click the mic and speak in English' },
-  { step: 3, icon: '🤖', title: 'Get Instant Feedback', description: 'AI replies and corrects grammar in real-time' },
-  { step: 4, icon: '📊', title: 'Review Your Report',   description: 'See your score and improvement tips after practice' },
+  { icon: '🎭', title: 'Pick a Scene', desc: 'Choose a real-world scenario from the left panel.' },
+  { icon: '🎤', title: 'Speak Freely', desc: 'Click the mic and talk naturally — no scripts needed.' },
+  { icon: '🤖', title: 'AI Responds', desc: 'Your AI partner replies and gently corrects mistakes.' },
+  { icon: '📊', title: 'Get Your Report', desc: 'Review your score, fluency, and vocabulary after each session.' },
 ]
 
 export default function HomePage() {
   const router = useRouter()
-  const [loading, setLoading] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState(SCENES[0])
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  async function handleSceneClick(sceneId: string) {
+  async function handleStart() {
     if (loading) return
-    setLoading(sceneId)
-    setError(null)
+    setLoading(true)
+    setError('')
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000)
+    const tid = setTimeout(() => controller.abort(), 6000)
     try {
       const res = await fetch(`${API_URL}/api/session/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scene: sceneId, difficulty }),
+        body: JSON.stringify({ scene: selected.id, difficulty }),
         signal: controller.signal,
       })
-      clearTimeout(timeoutId)
+      clearTimeout(tid)
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const data = await res.json()
-      const sessionId = data.session_id
-      if (!sessionId) throw new Error('No session ID in response')
-      router.push(`/practice/${sceneId}?session_id=${sessionId}`)
+      if (!data.session_id) throw new Error('No session ID')
+      router.push(`/practice/${selected.id}?session_id=${data.session_id}`)
     } catch (err) {
-      clearTimeout(timeoutId)
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError('Connection timed out — is the backend running?')
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to connect')
-      }
-      setLoading(null)
+      clearTimeout(tid)
+      setError(err instanceof Error && err.name === 'AbortError' ? 'Connection timed out.' : 'Could not reach server.')
+      setLoading(false)
     }
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50">
-      {/* 环境光晕 */}
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-rose-200/40 blur-[100px]" />
-        <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-pink-200/30 blur-[120px]" />
+    <div className="min-h-screen">
+
+      {/* ── Rich background for real glassmorphism ── */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[#f0e0eb]">
+        <div className="absolute -top-40 left-1/4   w-[700px] h-[700px] rounded-full bg-pink-400/35  blur-[160px]" />
+        <div className="absolute bottom-0  right-1/4  w-[650px] h-[650px] rounded-full bg-rose-400/30  blur-[150px]" />
+        <div className="absolute top-1/3  -right-32   w-[500px] h-[500px] rounded-full bg-purple-300/20 blur-[130px]" />
+        <div className="absolute top-1/4  -left-32    w-[450px] h-[450px] rounded-full bg-pink-300/25  blur-[120px]" />
+        <div className="absolute bottom-1/4 left-1/2  w-[300px] h-[300px] rounded-full bg-rose-300/15  blur-[100px]" />
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-16">
-        {/* ── Hero ─────────────────────────────────────── */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-xl border border-pink-100 rounded-full px-4 py-1.5 mb-6 shadow-[0_2px_12px_rgba(244,114,182,0.1)]">
-            <span className="w-2 h-2 bg-rose-400 rounded-full animate-pulse" />
-            <span className="text-rose-500 text-sm font-medium">AI-Powered Speaking Coach</span>
+      {/* ── Sticky glass header ── */}
+      <header className="sticky top-0 z-20 bg-white/12 backdrop-blur-2xl border-b border-white/30">
+        <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center gap-3">
+          <span className="text-2xl">🎙️</span>
+          <span className="text-lg font-bold bg-gradient-to-r from-rose-500 to-pink-500 bg-clip-text text-transparent">
+            AI English Coach
+          </span>
+          <div className="ml-auto flex items-center gap-4">
+            <Link href="/history"
+              className="text-sm text-gray-500 hover:text-rose-500 transition-colors">
+              History
+            </Link>
+            <Link href="/assessment"
+              className="text-sm bg-white/30 backdrop-blur-xl border border-white/50 text-rose-500 font-medium px-4 py-1.5 rounded-full hover:bg-white/50 transition-all">
+              📊 Speaking Test
+            </Link>
           </div>
-          <h1 className="text-5xl font-bold tracking-tight bg-gradient-to-r from-rose-500 to-pink-500 bg-clip-text text-transparent mb-4">
-            Master English Speaking
-          </h1>
-          <p className="text-lg text-gray-400 max-w-md mx-auto">
-            Practice real conversations with AI. Get instant grammar feedback.
-          </p>
         </div>
+      </header>
 
-        {/* ── Assessment 横幅 ──────────────────────────── */}
-        <div className="flex justify-center mb-10">
-          <Link
-            href="/assessment"
-            className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-xl border border-pink-100 rounded-full px-5 py-2 text-sm text-rose-500 font-medium shadow-[0_2px_12px_rgba(244,114,182,0.1)] hover:shadow-[0_4px_20px_rgba(244,114,182,0.18)] hover:-translate-y-0.5 transition-all duration-200"
-          >
-            📊 Not sure your level? Take a 5-minute speaking test →
-          </Link>
-        </div>
+      {/* ── Main two-column layout ── */}
+      <div className="max-w-6xl mx-auto px-6 py-8 flex gap-5 items-start">
 
-        {/* ── Difficulty selector ──────────────────────── */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <span className="text-sm text-gray-400 font-medium mr-1">Difficulty:</span>
-          {(['easy', 'medium', 'hard'] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDifficulty(d)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                difficulty === d
-                  ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-[0_2px_10px_rgba(244,63,94,0.25)]'
-                  : 'bg-white border border-pink-100 text-gray-500 hover:border-rose-200 hover:text-rose-400'
-              }`}
-            >
-              {d === 'easy' ? '🌸 Beginner' : d === 'medium' ? '🌺 Intermediate' : '🔥 Advanced'}
-            </button>
-          ))}
-        </div>
+        {/* ── Left sidebar ── */}
+        <aside className="w-56 shrink-0 sticky top-24">
+          <nav className="bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl overflow-hidden
+            shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
 
-        {error && (
-          <div className="mb-6 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-500 text-sm max-w-md mx-auto">
-            ⚠️ {error} — make sure the backend server is running at {API_URL}
-          </div>
-        )}
-
-        {/* ── Scene cards ──────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          {SCENES.map((scene) => (
-            <div
-              key={scene.id}
-              onClick={() => handleSceneClick(scene.id)}
-              className={`relative bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 cursor-pointer shadow-[0_4px_24px_rgba(244,114,182,0.07)] hover:shadow-[0_8px_32px_rgba(244,114,182,0.14)] hover:-translate-y-1 transition-all duration-300 ${
-                loading === scene.id ? 'opacity-60 pointer-events-none' : ''
-              }`}
-            >
-              <div className="text-3xl mb-3">{scene.icon}</div>
-              <h3 className="font-semibold text-gray-800 mb-0.5">{scene.title}</h3>
-              <p className="text-xs text-gray-400">{scene.subtitle}</p>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">{scene.description}</p>
-              {loading === scene.id && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-sm">
-                  <div className="w-5 h-5 border-2 border-rose-200 border-t-rose-500 rounded-full animate-spin" />
-                </div>
-              )}
+            <div className="p-2 pt-3">
+              <p className="text-[10px] font-semibold text-rose-400/80 uppercase tracking-widest px-3 mb-1">
+                Practice
+              </p>
+              {SCENES.map(scene => {
+                const active = selected.id === scene.id
+                return (
+                  <button key={scene.id}
+                    onClick={() => setSelected(scene)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${
+                      active
+                        ? 'bg-gradient-to-r from-rose-400/20 to-pink-400/20 border border-rose-300/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
+                        : 'hover:bg-white/30 border border-transparent'
+                    }`}>
+                    <span className="text-[18px] leading-none">{scene.icon}</span>
+                    <span className={`text-sm font-medium truncate ${active ? 'text-rose-600' : 'text-gray-600'}`}>
+                      {scene.title}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          ))}
-        </div>
 
-        {/* ── SDE Interview Entry ──────────────────────── */}
-        <div
-          onClick={() => router.push('/sde-interview')}
-          className="mt-2 cursor-pointer bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.1)] hover:shadow-[0_8px_32px_rgba(244,114,182,0.18)] hover:-translate-y-0.5 transition-all duration-300 mb-12"
-        >
-          <div className="flex items-center gap-4">
-            <span className="text-4xl">🧑‍💻</span>
-            <div className="flex-1">
-              <h3 className="font-bold text-gray-800 text-lg">SDE Interview Practice</h3>
-              <p className="text-sm text-gray-400 mt-0.5">Behavioral · Project Deep-Dive · CS Thinking</p>
-              <p className="text-xs text-rose-400 mt-1">Add your resume &amp; JD for personalized questions</p>
+            <div className="mx-3 border-t border-white/40 my-1.5" />
+
+            <div className="p-2 pb-3">
+              <p className="text-[10px] font-semibold text-rose-400/80 uppercase tracking-widest px-3 mb-1">
+                Special
+              </p>
+              <Link href="/sde-interview"
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-white/30 border border-transparent transition-all duration-200 group">
+                <span className="text-[18px] leading-none">🧑‍💻</span>
+                <span className="text-sm font-medium text-gray-600 group-hover:text-rose-500 transition-colors">SDE Interview</span>
+              </Link>
+              <Link href="/assessment"
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-white/30 border border-transparent transition-all duration-200 group">
+                <span className="text-[18px] leading-none">📊</span>
+                <span className="text-sm font-medium text-gray-600 group-hover:text-rose-500 transition-colors">Speaking Test</span>
+              </Link>
+              <Link href="/history"
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-white/30 border border-transparent transition-all duration-200 group">
+                <span className="text-[18px] leading-none">📈</span>
+                <span className="text-sm font-medium text-gray-600 group-hover:text-rose-500 transition-colors">My History</span>
+              </Link>
             </div>
-            <span className="text-rose-400 text-xl">→</span>
-          </div>
-        </div>
+          </nav>
+        </aside>
 
-        {/* ── How to Use ───────────────────────────────── */}
-        <div className="mb-10">
-          <h2 className="text-xl font-bold text-gray-800 text-center mb-6">How to Use</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {HOW_TO_USE.map(({ step, icon, title, description }) => (
-              <div key={step} className="bg-white/60 backdrop-blur-xl border border-pink-100 rounded-2xl p-5 text-center">
-                <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-xl mx-auto mb-3">
-                  {icon}
+        {/* ── Right content area ── */}
+        <div className="flex-1 space-y-4">
+
+          {/* Scene hero */}
+          <div className="bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-8
+            shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
+            <div className="flex items-start gap-6">
+              <div className="text-6xl leading-none shrink-0">{selected.icon}</div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-2xl font-bold text-gray-800">{selected.title}</h2>
+                  <span className="text-xs bg-rose-400/15 border border-rose-300/40 text-rose-500 px-2.5 py-0.5 rounded-full font-medium">
+                    AI Role-play
+                  </span>
                 </div>
-                <p className="text-xs font-semibold text-gray-700 mb-1">{title}</p>
-                <p className="text-xs text-gray-400 leading-relaxed">{description}</p>
+                <p className="text-gray-500 leading-relaxed mb-5">{selected.desc}</p>
+                <div className="flex flex-wrap gap-2">
+                  {selected.tips.map((tip, i) => (
+                    <span key={i}
+                      className="text-xs bg-white/40 border border-white/60 text-gray-500 px-3 py-1 rounded-full">
+                      ✦ {tip}
+                    </span>
+                  ))}
+                </div>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
 
-        {/* ── Footer ───────────────────────────────────── */}
-        <div className="text-center mt-8 space-y-2">
-          <Link href="/history" className="text-sm text-rose-400 hover:text-rose-500 transition-colors">
-            View Progress History →
-          </Link>
-          <p className="text-gray-400 text-xs">Powered by Claude AI · OpenAI Whisper · Web Speech API</p>
+          {/* Difficulty + Start */}
+          <div className="bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-6
+            shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-600 mb-2.5">Difficulty</p>
+                <div className="flex gap-2">
+                  {(['easy', 'medium', 'hard'] as const).map(d => (
+                    <button key={d} onClick={() => setDifficulty(d)}
+                      className={`px-3.5 py-1.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                        difficulty === d
+                          ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-[0_4px_16px_rgba(244,63,94,0.30)]'
+                          : 'bg-white/40 border border-white/60 text-gray-500 hover:bg-white/60'
+                      }`}>
+                      {d === 'easy' ? '🌸 Beginner' : d === 'medium' ? '🌺 Intermediate' : '🔥 Advanced'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={handleStart} disabled={loading}
+                className="sm:self-end px-7 py-3 rounded-xl font-semibold text-white text-sm
+                bg-gradient-to-r from-rose-400 to-pink-500
+                shadow-[0_4px_20px_rgba(244,63,94,0.35)] hover:shadow-[0_6px_28px_rgba(244,63,94,0.45)]
+                hover:scale-[1.02] transition-all duration-200 disabled:opacity-60 whitespace-nowrap">
+                {loading ? 'Starting...' : `Start →`}
+              </button>
+            </div>
+            {error && <p className="text-rose-400 text-sm mt-3">{error}</p>}
+          </div>
+
+          {/* How it works */}
+          <div className="bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-6
+            shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
+            <p className="text-sm font-semibold text-gray-600 mb-4">How It Works</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {HOW_TO_USE.map((s, i) => (
+                <div key={i}
+                  className="bg-white/30 border border-white/50 rounded-xl p-4 text-center
+                  shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+                  <div className="text-2xl mb-2">{s.icon}</div>
+                  <p className="text-xs font-semibold text-gray-700 mb-1">{s.title}</p>
+                  <p className="text-xs text-gray-400 leading-relaxed">{s.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
-    </main>
+    </div>
   )
 }

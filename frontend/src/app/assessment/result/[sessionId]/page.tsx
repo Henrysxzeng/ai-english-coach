@@ -66,9 +66,9 @@ export default function AssessmentResultPage() {
   return (
     <main className="relative min-h-screen overflow-hidden py-10 px-4">
       {/* 环境光晕 */}
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[#f0e0eb]">
-        <div className="absolute -top-40 left-1/4   w-[700px] h-[700px] rounded-full bg-pink-400/35  blur-[160px]" />
-        <div className="absolute bottom-0  right-1/4  w-[600px] h-[600px] rounded-full bg-rose-400/30  blur-[140px]" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[#fdf8fb]">
+        <div className="absolute -top-40 left-1/4   w-[700px] h-[700px] rounded-full bg-pink-300/20  blur-[160px]" />
+        <div className="absolute bottom-0  right-1/4  w-[600px] h-[600px] rounded-full bg-rose-300/15  blur-[140px]" />
         <div className="absolute top-1/3  -right-32   w-[500px] h-[500px] rounded-full bg-purple-300/20 blur-[130px]" />
         <div className="absolute top-1/4  -left-32    w-[450px] h-[450px] rounded-full bg-pink-300/25  blur-[120px]" />
       </div>

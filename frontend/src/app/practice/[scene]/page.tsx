@@ -531,7 +531,7 @@ function PracticeContent({ scene }: { scene: string }) {
                   ))}
                 </div>
                 {pronResult.expression_comment && (
-                  <p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-2 py-1 mb-2">{pronResult.expression_comment}</p>
+                  <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-2 py-1.5 mb-2 leading-relaxed">💡 {pronResult.expression_comment}</p>
                 )}
                 {pronResult.words.filter(w => w.error_type !== 'None' || w.accuracy < 70).length > 0 && (
                   <div>

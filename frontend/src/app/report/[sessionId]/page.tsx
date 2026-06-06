@@ -107,6 +107,49 @@ function ScoreCard({ label, value, suffix = '' }: { label: string; value: number
   )
 }
 
+// ─── Ability radar chart ─────────────────────────────────────────────────────
+
+function RadarChart({ scores }: { scores: { label: string; value: number }[] }) {
+  const size = 300, cx = size / 2, cy = size / 2, R = 95
+  const n = scores.length
+  const angle = (i: number) => (Math.PI * 2 * i) / n - Math.PI / 2
+  const point = (i: number, r: number): [number, number] => {
+    const a = angle(i)
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)]
+  }
+  const dataPts = scores.map((s, i) => point(i, R * Math.max(0, Math.min(100, s.value)) / 100))
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
+      {[0.25, 0.5, 0.75, 1].map((rr, ri) => (
+        <polygon key={ri} points={scores.map((_, i) => point(i, R * rr).join(',')).join(' ')} fill="none" stroke="#fce7f3" strokeWidth="1" />
+      ))}
+      {scores.map((_, i) => {
+        const [x, y] = point(i, R)
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#fce7f3" strokeWidth="1" />
+      })}
+      <polygon points={dataPts.map((p) => p.join(',')).join(' ')} fill="rgba(244,63,94,0.18)" stroke="#f43f5e" strokeWidth="2" strokeLinejoin="round" />
+      {dataPts.map((p, i) => (<circle key={i} cx={p[0]} cy={p[1]} r="3.5" fill="#f43f5e" stroke="white" strokeWidth="1" />))}
+      {scores.map((s, i) => {
+        const [x, y] = point(i, R + 24)
+        return (
+          <text key={i} x={x} y={y} textAnchor="middle" dominantBaseline="middle" fill="#6b7280" style={{ fontSize: '11px', fontFamily: 'system-ui, sans-serif' }}>
+            {s.label} {Math.round(s.value)}
+          </text>
+        )
+      })}
+    </svg>
+  )
+}
+
+function cefrLevel(score: number): { level: string; label: string } {
+  if (score >= 90) return { level: 'C2', label: 'Proficient' }
+  if (score >= 80) return { level: 'C1', label: 'Advanced' }
+  if (score >= 70) return { level: 'B2', label: 'Upper-Intermediate' }
+  if (score >= 55) return { level: 'B1', label: 'Intermediate' }
+  if (score >= 40) return { level: 'A2', label: 'Elementary' }
+  return { level: 'A1', label: 'Beginner' }
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReportPage() {
@@ -209,6 +252,28 @@ export default function ReportPage() {
         {/* 1. Overall score ring */}
         <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-8 shadow-[0_4px_24px_rgba(244,114,182,0.08)] flex justify-center">
           <ScoreRing score={report.overall_score ?? 0} />
+        </div>
+
+        {/* 1b. Ability radar + CEFR level */}
+        <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.08)]">
+          <h2 className="font-semibold text-gray-800 mb-2">🧭 Ability Profile</h2>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <RadarChart scores={[
+              { label: 'Pron', value: report.pronunciation_score ?? 0 },
+              { label: 'Fluency', value: report.fluency_score ?? 0 },
+              { label: 'Vocab', value: report.vocabulary_score ?? 0 },
+              { label: 'Clarity', value: report.clarity_score ?? 0 },
+              { label: 'Structure', value: report.structure_score ?? 0 },
+            ]} />
+            <div className="text-center">
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">CEFR Level</p>
+              <p className="text-5xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
+                {cefrLevel(report.overall_score ?? 0).level}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">{cefrLevel(report.overall_score ?? 0).label}</p>
+              <p className="text-xs text-gray-400 mt-3 max-w-[160px] mx-auto leading-relaxed">综合五维能力的欧标等级评定</p>
+            </div>
+          </div>
         </div>
 
         {/* 2. Score cards */}

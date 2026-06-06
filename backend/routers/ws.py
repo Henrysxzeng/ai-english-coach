@@ -96,6 +96,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             if not user_text:
                 continue
 
+            personality = msg.get("personality", "friendly")
+
             duration_ms = int(msg.get("duration_ms") or 0)
             now = datetime.now(timezone.utc).isoformat()
 
@@ -121,7 +123,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             ai_text = ""
             try:
                 async for delta in get_ai_response_stream(
-                    scene, messages, difficulty, resume_context=resume_context, jd_context=jd_context
+                    scene, messages, difficulty, resume_context=resume_context, jd_context=jd_context, personality=personality
                 ):
                     ai_text += delta
                     await websocket.send_json({"type": "stream_chunk", "delta": delta})

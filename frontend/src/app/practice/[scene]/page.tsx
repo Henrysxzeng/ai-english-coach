@@ -56,6 +56,7 @@ function PracticeContent({ scene }: { scene: string }) {
   const [hasMemory, setHasMemory] = useState(false)
   const [memoryGreeting, setMemoryGreeting] = useState('')
   const [recordingMode, setRecordingMode] = useState<'auto' | 'manual'>('auto')
+  const [personality, setPersonality] = useState<'friendly' | 'strict' | 'tough'>('friendly')
   const [pendingText, setPendingText] = useState('')
   const [difficulty, setDifficulty] = useState<string>('')
 
@@ -197,9 +198,9 @@ function PracticeContent({ scene }: { scene: string }) {
 
   const sendMessage = useCallback((text: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) { setStatusText('WebSocket not connected'); return }
-    wsRef.current.send(JSON.stringify({ type: 'user_message', text, duration_ms: Date.now() - recordingStartRef.current }))
+    wsRef.current.send(JSON.stringify({ type: 'user_message', text, duration_ms: Date.now() - recordingStartRef.current, personality }))
     setIsWaiting(true); setPendingText(''); setStatusText('Waiting for AI...')
-  }, [])
+  }, [personality])
 
   const handleMicClick = useCallback(() => {
     // If recording, stop
@@ -528,6 +529,18 @@ function PracticeContent({ scene }: { scene: string }) {
 
           {/* Mic button area */}
           <div className="border-t border-white/40 bg-white/22 backdrop-blur-2xl p-5 flex flex-col items-center gap-2">
+            {/* Interviewer personality toggle */}
+            <div className="flex items-center gap-1.5 text-xs mb-1">
+              <span className="text-gray-400">风格:</span>
+              {([['friendly', '😊 友好'], ['strict', '🔥 严厉'], ['tough', '😐 冷面']] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setPersonality(id)}
+                  className={`px-2 py-1 rounded ${personality === id ? 'bg-rose-50 text-rose-500 font-semibold border border-rose-200' : 'text-gray-400 hover:bg-gray-50'}`}
+                >{label}</button>
+              ))}
+            </div>
+
             {/* Recording mode toggle */}
             <div className="flex items-center gap-2 text-xs text-gray-400">
               <button

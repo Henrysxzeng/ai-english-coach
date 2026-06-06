@@ -57,6 +57,7 @@ function PracticeContent({ scene }: { scene: string }) {
   const [memoryGreeting, setMemoryGreeting] = useState('')
   const [recordingMode, setRecordingMode] = useState<'auto' | 'manual'>('auto')
   const [personality, setPersonality] = useState<'friendly' | 'strict' | 'tough'>('friendly')
+  const [vocabWords, setVocabWords] = useState<string[]>([])
   const [pendingText, setPendingText] = useState('')
   const [difficulty, setDifficulty] = useState<string>('')
 
@@ -102,6 +103,7 @@ function PracticeContent({ scene }: { scene: string }) {
       window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices()
     }
     fetchUsage()
+    fetchVocab()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -198,9 +200,9 @@ function PracticeContent({ scene }: { scene: string }) {
 
   const sendMessage = useCallback((text: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) { setStatusText('WebSocket not connected'); return }
-    wsRef.current.send(JSON.stringify({ type: 'user_message', text, duration_ms: Date.now() - recordingStartRef.current, personality }))
+    wsRef.current.send(JSON.stringify({ type: 'user_message', text, duration_ms: Date.now() - recordingStartRef.current, personality, vocab_hints: vocabWords.slice(0, 5) }))
     setIsWaiting(true); setPendingText(''); setStatusText('Waiting for AI...')
-  }, [personality])
+  }, [personality, vocabWords])
 
   const handleMicClick = useCallback(() => {
     // If recording, stop
@@ -272,6 +274,16 @@ function PracticeContent({ scene }: { scene: string }) {
       if (token) headers['Authorization'] = `Bearer ${token}`
       const res = await fetch(`${API_URL}/api/user/status`, { headers })
       if (res.ok) setUsageInfo(await res.json())
+    } catch {}
+  }
+
+  async function fetchVocab() {
+    try {
+      const token = await getToken()
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_URL}/api/vocab`, { headers })
+      if (res.ok) { const rows = await res.json(); setVocabWords(rows.map((r: { word: string }) => r.word)) }
     } catch {}
   }
 

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '@clerk/nextjs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -35,7 +36,23 @@ export default function WordTooltip({ children, className }: Props) {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [loading, setLoading] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const { getToken } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
+
+  async function saveWord() {
+    if (!tooltip || saved) return
+    try {
+      const token = await getToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      await fetch(`${API_URL}/api/vocab`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ word: tooltip.word, definition: tooltip.definition || tooltip.translation || '' }),
+      })
+      setSaved(true)
+    } catch {}
+  }
 
   useEffect(() => {
     async function handleMouseUp(e: MouseEvent) {
@@ -44,6 +61,7 @@ export default function WordTooltip({ children, className }: Props) {
       const sel = window.getSelection()
       const raw = sel?.toString().trim() ?? ''
       if (!raw || raw.length < 2) { setTooltip(null); return }
+      setSaved(false)
 
       const range = sel?.getRangeAt(0)
       const rect = range?.getBoundingClientRect()
@@ -120,13 +138,24 @@ export default function WordTooltip({ children, className }: Props) {
               <>
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="font-semibold text-gray-800 text-sm truncate">{tooltip.word}</span>
-                  <button
-                    onMouseDown={e => e.stopPropagation()}
-                    onMouseUp={e => e.stopPropagation()}
-                    onClick={() => speak(tooltip.word)}
-                    className="text-rose-400 hover:text-rose-600 text-base shrink-0"
-                    title="Play pronunciation"
-                  >🔊</button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!tooltip.isPhrase && (
+                      <button
+                        onMouseDown={e => e.stopPropagation()}
+                        onMouseUp={e => e.stopPropagation()}
+                        onClick={saveWord}
+                        className="text-base"
+                        title="收藏到生词本"
+                      >{saved ? '✅' : '⭐'}</button>
+                    )}
+                    <button
+                      onMouseDown={e => e.stopPropagation()}
+                      onMouseUp={e => e.stopPropagation()}
+                      onClick={() => speak(tooltip.word)}
+                      className="text-rose-400 hover:text-rose-600 text-base"
+                      title="Play pronunciation"
+                    >🔊</button>
+                  </div>
                 </div>
                 {tooltip.phonetic && (
                   <p className="text-rose-400 text-xs font-mono mb-1">{tooltip.phonetic}</p>

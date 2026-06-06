@@ -158,6 +158,7 @@ async def get_ai_response_stream(
     resume_context: str = "",
     jd_context: str = "",
     personality: str = "friendly",
+    vocab_hints: list | None = None,
 ):
     """流式生成 AI 回复，逐块 yield，降低首字延迟。"""
     system_prompt = (
@@ -180,6 +181,12 @@ async def get_ai_response_stream(
         system_prompt += " The user gave a very short answer — keep your reply simple and warm, and gently encourage them to say a little more."
     elif wc > 20:
         system_prompt += " The user is speaking fluently and at length — feel free to use richer, more idiomatic vocabulary and raise the challenge a notch."
+
+    if vocab_hints:
+        system_prompt += (
+            " The learner is studying these words: " + ", ".join(vocab_hints[:5]) + ". "
+            "If it fits naturally, weave ONE of them into your reply to reinforce it — never force it."
+        )
 
     stream = await client.chat.completions.create(
         model="deepseek-chat",

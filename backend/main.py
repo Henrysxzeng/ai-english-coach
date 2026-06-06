@@ -9,6 +9,7 @@ from routers import session, ws, report, history, assessment
 from routers.parse_pdf import router as parse_pdf_router
 from routers.pronunciation import router as pronunciation_router
 from routers.afdian import router as afdian_router
+from routers.vocab import router as vocab_router
 
 
 @asynccontextmanager
@@ -35,6 +36,7 @@ app.include_router(assessment.router)
 app.include_router(parse_pdf_router)
 app.include_router(pronunciation_router)
 app.include_router(afdian_router)
+app.include_router(vocab_router)
 
 
 @app.get("/health")

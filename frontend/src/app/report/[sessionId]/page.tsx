@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import WordTooltip from '@/components/WordTooltip'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -44,6 +45,7 @@ interface Report {
   filler_count?: number
   filler_words?: string[]
   key_vocabulary?: Array<{ word: string; definition: string; example: string }>
+  pronunciation_tips?: Array<{ word: string; ipa: string; tip: string }>
   interview_feedback?: {
     communication_score: number
     star_coverage: {
@@ -112,6 +114,7 @@ export default function ReportPage() {
   const sessionId = params.sessionId as string
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     fetch(`${API_URL}/api/report/${sessionId}`)
@@ -140,6 +143,42 @@ export default function ReportPage() {
   }
 
   const durationMin = report.duration_seconds > 0 ? Math.round(report.duration_seconds / 60) : null
+
+  function handleCopy() {
+    if (!report) return
+    const lines: string[] = [
+      '=== AI English Coach Practice Report ===',
+      `Scene: ${report.scene ?? sessionId}  |  Score: ${report.overall_score ?? '—'}/100`,
+      '',
+    ]
+    if (report.corrections && report.corrections.length > 0) {
+      lines.push('── Corrections ──')
+      report.corrections.forEach((c, i) => {
+        lines.push(`${i + 1}. "${c.original}"`)
+        lines.push(`   → "${c.corrected}"`)
+        lines.push(`   ${c.explanation}`)
+      })
+      lines.push('')
+    }
+    if (report.key_vocabulary && report.key_vocabulary.length > 0) {
+      lines.push('── Key Vocabulary ──')
+      report.key_vocabulary.forEach((v) => {
+        lines.push(`• ${v.word}: ${v.definition}`)
+        lines.push(`  e.g. "${v.example}"`)
+      })
+      lines.push('')
+    }
+    if (report.pronunciation_tips && report.pronunciation_tips.length > 0) {
+      lines.push('── Pronunciation Tips ──')
+      report.pronunciation_tips.forEach((t) => {
+        lines.push(`• ${t.word} ${t.ipa}: ${t.tip}`)
+      })
+    }
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden py-10 px-4">
@@ -190,7 +229,7 @@ export default function ReportPage() {
         <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
           <h2 className="font-semibold text-gray-800 mb-4">Grammar Corrections</h2>
           {report.corrections?.length > 0 ? (
-            <div className="space-y-3">
+            <WordTooltip className="space-y-3">
               {report.corrections.map((c, i) => (
                 <div key={i} className="bg-rose-50 border border-rose-100 rounded-xl p-4">
                   <p className="text-xs text-rose-500 font-medium mb-1">Original</p>
@@ -200,7 +239,7 @@ export default function ReportPage() {
                   <p className="text-xs text-gray-400 mt-2 leading-relaxed">{c.explanation}</p>
                 </div>
               ))}
-            </div>
+            </WordTooltip>
           ) : (
             <p className="text-sm text-green-600 font-medium">No grammar errors detected — great job!</p>
           )}
@@ -364,13 +403,19 @@ export default function ReportPage() {
         )}
 
         {/* 10. Actions */}
-        <div className="flex items-center justify-center gap-4 py-4 print:hidden">
+        <div className="flex flex-wrap items-center justify-center gap-3 py-4 print:hidden">
           <Link
             href="/"
             className="inline-block px-8 py-3 bg-gradient-to-r from-rose-400 to-pink-500 text-white font-semibold rounded-xl shadow-[0_4px_16px_rgba(244,63,94,0.28)] hover:shadow-[0_6px_24px_rgba(244,63,94,0.38)] hover:scale-[1.02] transition-all duration-200"
           >
             Practice Again
           </Link>
+          <button
+            onClick={handleCopy}
+            className="px-6 py-3 rounded-xl font-semibold text-sm border border-white/40 bg-white/22 backdrop-blur-2xl text-gray-600 hover:bg-white/40 transition-all duration-200"
+          >
+            {copied ? '✓ Copied!' : '📋 Copy Summary'}
+          </button>
           <button
             onClick={() => window.print()}
             className="inline-block px-6 py-3 border border-rose-200 text-rose-500 bg-white hover:bg-rose-50 font-semibold rounded-xl transition-all duration-200"

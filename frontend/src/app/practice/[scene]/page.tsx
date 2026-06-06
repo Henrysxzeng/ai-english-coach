@@ -5,6 +5,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import WordTooltip from '@/components/WordTooltip'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
@@ -255,13 +256,17 @@ function PracticeContent({ scene }: { scene: string }) {
                   {msg.role === 'ai' && (
                     <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">AI</div>
                   )}
-                  <div className={`max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === 'ai'
-                      ? 'bg-white/90 border border-pink-100 text-gray-700 rounded-bl-sm shadow-[0_2px_8px_rgba(244,114,182,0.08)]'
-                      : 'bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-br-sm shadow-[0_2px_12px_rgba(244,63,94,0.2)]'
-                  }`}>
-                    {msg.text}
-                  </div>
+                  {msg.role === 'ai' ? (
+                    <WordTooltip className="inline">
+                      <div className="max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-white/90 border border-pink-100 text-gray-700 rounded-bl-sm shadow-[0_2px_8px_rgba(244,114,182,0.08)]">
+                        {msg.text}
+                      </div>
+                    </WordTooltip>
+                  ) : (
+                    <div className="max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-br-sm shadow-[0_2px_12px_rgba(244,63,94,0.2)]">
+                      {msg.text}
+                    </div>
+                  )}
                   {msg.role === 'user' && (
                     <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">Me</div>
                   )}

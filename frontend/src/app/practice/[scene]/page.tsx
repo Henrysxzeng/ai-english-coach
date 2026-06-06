@@ -282,7 +282,7 @@ function PracticeContent({ scene }: { scene: string }) {
           </div>
 
           {/* Mic button area */}
-          <div className="border-t border-pink-100 bg-white/80 backdrop-blur-xl p-5 flex flex-col items-center gap-2">
+          <div className="border-t border-white/40 bg-white/22 backdrop-blur-2xl p-5 flex flex-col items-center gap-2">
             {/* Recording mode toggle */}
             <div className="flex items-center gap-2 text-xs text-gray-400">
               <button

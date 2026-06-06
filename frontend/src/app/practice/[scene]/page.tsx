@@ -126,12 +126,29 @@ function PracticeContent({ scene }: { scene: string }) {
     ws.onmessage = (event) => {
       try {
         const data: any = JSON.parse(event.data)
-        if (data.type === 'response') {
+        if (data.type === 'stream_start') {
           setIsWaiting(false)
           setMessages((prev) => {
             const next = [...prev]
             if (data.user_text) next.push({ role: 'user', text: data.user_text })
-            if (data.ai_text) next.push({ role: 'ai', text: data.ai_text })
+            next.push({ role: 'ai', text: '' })
+            return next
+          })
+          setStatusText('AI is replying...')
+        } else if (data.type === 'stream_chunk') {
+          setMessages((prev) => {
+            if (prev.length === 0) return prev
+            const next = [...prev]
+            const last = next[next.length - 1]
+            if (last.role === 'ai') next[next.length - 1] = { ...last, text: last.text + (data.delta || '') }
+            return next
+          })
+        } else if (data.type === 'stream_end') {
+          setMessages((prev) => {
+            if (prev.length === 0) return prev
+            const next = [...prev]
+            const last = next[next.length - 1]
+            if (last.role === 'ai') next[next.length - 1] = { ...last, text: data.ai_text || last.text }
             return next
           })
           if (data.correction) setCorrection(data.correction)

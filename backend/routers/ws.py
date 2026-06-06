@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import aiosqlite
 from dotenv import load_dotenv
-from services.llm_service import get_ai_response, evaluate_correction, evaluate_upgrade, generate_memory_greeting
+from services.llm_service import get_ai_response, get_ai_response_stream, evaluate_correction, evaluate_upgrade, generate_memory_greeting
 
 load_dotenv()
 
@@ -110,22 +110,27 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             messages = history + [{"role": "user", "content": user_text}]
 
-            # Parallel: correction + AI response, with timeout
+            # 并行启动纠错与表达升级（不阻塞流式回复）
+            correction_task = asyncio.create_task(evaluate_correction(user_text))
+            upgrade_task = asyncio.create_task(evaluate_upgrade(user_text))
+
+            # 通知前端显示用户消息并准备接收流式回复
+            await websocket.send_json({"type": "stream_start", "user_text": user_text, "turn_id": turn_id})
+
+            # 流式生成 AI 回复，逐块下发，降低首字延迟
+            ai_text = ""
             try:
-                correction, upgrade, ai_text = await asyncio.wait_for(
-                    asyncio.gather(
-                        evaluate_correction(user_text),
-                        evaluate_upgrade(user_text),
-                        get_ai_response(scene, messages, difficulty, resume_context=resume_context, jd_context=jd_context),
-                    ),
-                    timeout=AI_RESPONSE_TIMEOUT,
-                )
-            except asyncio.TimeoutError:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": "AI response timed out, please try again",
-                })
-                continue
+                async for delta in get_ai_response_stream(
+                    scene, messages, difficulty, resume_context=resume_context, jd_context=jd_context
+                ):
+                    ai_text += delta
+                    await websocket.send_json({"type": "stream_chunk", "delta": delta})
+            except Exception:
+                if not ai_text:
+                    ai_text = "Sorry, I had trouble responding. Could you say that again?"
+
+            correction = await correction_task
+            upgrade = await upgrade_task
 
             # Verify session still exists, then persist
             async with aiosqlite.connect(DB_PATH) as db:
@@ -160,8 +165,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 await db.commit()
 
             await websocket.send_json({
-                "type": "response",
-                "user_text": user_text,
+                "type": "stream_end",
                 "ai_text": ai_text,
                 "correction": correction,
                 "upgrade": upgrade,

@@ -136,6 +136,35 @@ async def get_ai_response(
     return response.choices[0].message.content.strip()
 
 
+async def get_ai_response_stream(
+    scene: str,
+    messages: list[dict],
+    difficulty: str = "medium",
+    resume_context: str = "",
+    jd_context: str = "",
+):
+    """流式生成 AI 回复，逐块 yield，降低首字延迟。"""
+    system_prompt = SCENE_PROMPTS.get(scene, SCENE_PROMPTS["interview"]) + DIFFICULTY_SUFFIX.get(difficulty, "")
+    context_parts = []
+    if resume_context:
+        context_parts.append(f"Resume: {resume_context}")
+    if jd_context:
+        context_parts.append(f"Job Description: {jd_context}")
+    if context_parts:
+        system_prompt += "\n\n[Candidate Context]\n" + "\n".join(context_parts) + "\nUse this context to make your questions more personalized and relevant."
+    stream = await client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "system", "content": system_prompt}] + messages,
+        max_tokens=150,
+        temperature=0.7,
+        stream=True,
+    )
+    async for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
 async def evaluate_correction(user_text: str) -> dict:
     prompt = (
         f'Analyze this English sentence for grammar correctness: "{user_text}"\n\n'

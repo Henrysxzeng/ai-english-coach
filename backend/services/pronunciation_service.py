@@ -5,55 +5,74 @@ import httpx
 
 AZURE_KEY = os.getenv("AZURE_SPEECH_KEY", "")
 AZURE_REGION = os.getenv("AZURE_SPEECH_REGION", "eastus")
+STT_URL = (
+    f"https://{AZURE_REGION}.stt.speech.microsoft.com"
+    "/speech/recognition/conversation/cognitiveservices/v1"
+    "?language=en-US&format=detailed"
+)
 
 
 async def assess_pronunciation(
     audio_bytes: bytes,
-    content_type: str = "audio/webm;codecs=opus",
+    content_type: str = "audio/wav",
 ) -> dict:
-    """
-    调用 Azure Speech REST API 评估发音。
-    audio_bytes: 浏览器 MediaRecorder 录制的音频（webm/opus 格式）
-    返回: 总分 + 逐词评分
-    """
     if not AZURE_KEY:
-        return _fallback()
+        return _fallback("no_azure_key")
 
-    url = (
-        f"https://{AZURE_REGION}.stt.speech.microsoft.com"
-        "/speech/recognition/conversation/cognitiveservices/v1"
-        "?language=en-US&format=detailed"
-    )
+    # Step 1: get transcript (no pronunciation header → Azure returns real words)
+    transcript = await _get_transcript(audio_bytes, content_type)
+    if not transcript:
+        return _fallback("no_transcript_detected")
 
-    # Pronunciation Assessment 配置（空 ReferenceText = 评测实际说出的词）
+    # Step 2: score pronunciation using transcript as ReferenceText
+    return await _score_with_reference(audio_bytes, content_type, transcript)
+
+
+async def _get_transcript(audio_bytes: bytes, content_type: str) -> str:
+    headers = {
+        "Ocp-Apim-Subscription-Key": AZURE_KEY,
+        "Content-Type": content_type,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(STT_URL, content=audio_bytes, headers=headers)
+            if resp.status_code != 200:
+                return ""
+            data = resp.json()
+            if data.get("RecognitionStatus") != "Success":
+                return ""
+            nbest = data.get("NBest", [{}])[0]
+            return nbest.get("Lexical", "").strip()
+    except Exception:
+        return ""
+
+
+async def _score_with_reference(
+    audio_bytes: bytes, content_type: str, reference_text: str
+) -> dict:
     pa_config = {
-        "ReferenceText": "",
+        "ReferenceText": reference_text,
         "GradingSystem": "HundredMark",
         "Granularity": "Word",
-        "EnableMiscue": False,
+        "EnableMiscue": True,
     }
     pa_header = base64.b64encode(json.dumps(pa_config).encode()).decode()
-
     headers = {
         "Ocp-Apim-Subscription-Key": AZURE_KEY,
         "Content-Type": content_type,
         "Pronunciation-Assessment": pa_header,
     }
-
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(url, content=audio_bytes, headers=headers)
+            resp = await client.post(STT_URL, content=audio_bytes, headers=headers)
             if resp.status_code != 200:
-                return _fallback(f"azure_{resp.status_code}: {resp.text[:300]}")
+                return _fallback(f"score_azure_{resp.status_code}")
             data = resp.json()
-            # return raw azure response for debugging
-            recognition_status = data.get("RecognitionStatus", "unknown")
-            if recognition_status != "Success":
-                return _fallback(f"RecognitionStatus={recognition_status} raw={str(data)[:300]}")
+            if data.get("RecognitionStatus") != "Success":
+                return _fallback(f"score_status={data.get('RecognitionStatus')}")
     except Exception as e:
         return _fallback(str(e)[:200])
 
-    # 解析结果
     nbest = data.get("NBest", [{}])[0]
     pa = nbest.get("PronunciationAssessment", {})
     words_raw = nbest.get("Words", [])
@@ -75,7 +94,7 @@ async def assess_pronunciation(
             "pron_score": round(pa.get("PronScore", 0), 1),
         },
         "words": words,
-        "transcript": nbest.get("Lexical", ""),
+        "transcript": reference_text,
     }
 
 

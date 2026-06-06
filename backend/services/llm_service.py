@@ -172,6 +172,15 @@ async def get_ai_response_stream(
         context_parts.append(f"Job Description: {jd_context}")
     if context_parts:
         system_prompt += "\n\n[Candidate Context]\n" + "\n".join(context_parts) + "\nUse this context to make your questions more personalized and relevant."
+
+    # 自适应难度：根据用户最近一次回答的长度动态微调（最近发展区 i+1）
+    last_user = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
+    wc = len(last_user.split())
+    if 0 < wc < 5:
+        system_prompt += " The user gave a very short answer — keep your reply simple and warm, and gently encourage them to say a little more."
+    elif wc > 20:
+        system_prompt += " The user is speaking fluently and at length — feel free to use richer, more idiomatic vocabulary and raise the challenge a notch."
+
     stream = await client.chat.completions.create(
         model="deepseek-chat",
         messages=[{"role": "system", "content": system_prompt}] + messages,

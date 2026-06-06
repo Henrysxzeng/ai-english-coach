@@ -4,7 +4,7 @@
 
 一款 AI 英语口语陪练 Web 应用：在真实场景下进行语音对话训练，提供**发音评测、语法/表达纠错、地道度反馈**与**课后量化总结**，帮助用户系统性提升英语口语。
 
-🔗 **在线体验**：https://ai-english-coach-52pn-zephyr-zanki.vercel.app
+🔗 **在线体验**：https://ai-english-coach-52pn.vercel.app （国内访问需科学上网）
 📖 **使用文档**：[docs/使用文档.md](docs/使用文档.md) · **功能文档**：[docs/功能文档.md](docs/功能文档.md)
 
 ---

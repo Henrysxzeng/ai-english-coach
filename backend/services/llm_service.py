@@ -104,6 +104,18 @@ DIFFICULTY_SUFFIX = {
     "hard": " Use advanced vocabulary, idioms, and natural fast speech (C1 level). Challenge the user with complex questions.",
 }
 
+PERSONALITY_STYLES = {
+    "friendly": "",  # 默认：温和鼓励
+    "strict": (
+        " Adopt a strict, demanding persona like a tough interviewer at a top tech company. "
+        "Be direct, hold a high bar, and push hard on weak or vague answers. Stay professional, never rude."
+    ),
+    "tough": (
+        " Adopt a cold, impatient persona. Keep replies short and a little blunt, show mild skepticism, "
+        "and challenge the user to be precise. Do not hand out praise easily."
+    ),
+}
+
 EMPTY_CORRECTION = {
     "has_error": False,
     "original": "",
@@ -145,9 +157,14 @@ async def get_ai_response_stream(
     difficulty: str = "medium",
     resume_context: str = "",
     jd_context: str = "",
+    personality: str = "friendly",
 ):
     """流式生成 AI 回复，逐块 yield，降低首字延迟。"""
-    system_prompt = SCENE_PROMPTS.get(scene, SCENE_PROMPTS["interview"]) + DIFFICULTY_SUFFIX.get(difficulty, "")
+    system_prompt = (
+        SCENE_PROMPTS.get(scene, SCENE_PROMPTS["interview"])
+        + DIFFICULTY_SUFFIX.get(difficulty, "")
+        + PERSONALITY_STYLES.get(personality, "")
+    )
     context_parts = []
     if resume_context:
         context_parts.append(f"Resume: {resume_context}")

@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import WordTooltip from '@/components/WordTooltip'
+import { useAuth } from '@clerk/nextjs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
@@ -56,6 +57,23 @@ function PracticeContent({ scene }: { scene: string }) {
   const [pendingText, setPendingText] = useState('')
   const [difficulty, setDifficulty] = useState<string>('')
 
+  const { getToken } = useAuth()
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const [pronResult, setPronResult] = useState<{
+    overall: { accuracy: number; fluency: number; pron_score: number }
+    words: Array<{ word: string; accuracy: number; error_type: string }>
+  } | null>(null)
+  const [pronLoading, setPronLoading] = useState(false)
+  const [usageInfo, setUsageInfo] = useState<{
+    used_today: number
+    daily_limit: number
+    remaining: number
+    is_pro: boolean
+  } | null>(null)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
   const wsRef = useRef<WebSocket | null>(null)
   const recognitionRef = useRef<any>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -70,6 +88,8 @@ function PracticeContent({ scene }: { scene: string }) {
       window.speechSynthesis.getVoices()
       window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices()
     }
+    fetchUsage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -158,10 +178,35 @@ function PracticeContent({ scene }: { scene: string }) {
     recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
     recognitionRef.current = recognition
     let accumulatedText = ''
-    recognition.onstart = () => { accumulatedText = ''; recordingStartRef.current = Date.now(); setIsListening(true); setStatusText('Listening… (click to stop)') }
+    recognition.onstart = () => {
+      accumulatedText = ''
+      recordingStartRef.current = Date.now()
+      setIsListening(true)
+      setStatusText('Listening… (click to stop)')
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        audioChunksRef.current = []
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm'
+        const mr = new MediaRecorder(stream, { mimeType })
+        mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+        mr.start()
+        mediaRecorderRef.current = mr
+      }).catch(() => {})
+    }
     recognition.onend = () => {
       setIsListening(false)
       const text = accumulatedText.trim(); accumulatedText = ''
+      const mr = mediaRecorderRef.current
+      if (mr && mr.state !== 'inactive') {
+        mr.stop()
+        mr.onstop = async () => {
+          mr.stream.getTracks().forEach(t => t.stop())
+          const mimeType = mr.mimeType || 'audio/webm'
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
+          if (audioBlob.size >= 1000) await sendPronunciationAssess(audioBlob)
+        }
+      }
       if (!text) return
       if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
       if (recordingMode === 'manual') { setPendingText(text); setStatusText('Review your message, then click Send ✉️'); return }
@@ -175,6 +220,35 @@ function PracticeContent({ scene }: { scene: string }) {
     }
     try { recognition.start() } catch { setStatusText('Could not start recognition') }
   }, [isListening, recordingMode, sendMessage])
+
+  async function fetchUsage() {
+    try {
+      const token = await getToken()
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_URL}/api/user/status`, { headers })
+      if (res.ok) setUsageInfo(await res.json())
+    } catch {}
+  }
+
+  async function sendPronunciationAssess(audioBlob: Blob) {
+    setPronLoading(true)
+    try {
+      const token = await getToken()
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'recording.webm')
+      const res = await fetch(`${API_URL}/api/pronunciation-assess`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      })
+      if (res.status === 429) { setShowUpgradeModal(true); return }
+      if (res.ok) { setPronResult(await res.json()); fetchUsage() }
+    } catch {}
+    finally { setPronLoading(false) }
+  }
 
   const handleEndPractice = async () => {
     if (isEnding) return
@@ -363,8 +437,54 @@ function PracticeContent({ scene }: { scene: string }) {
           </div>
         </div>
 
-        {/* Right: Correction panel */}
-        <div className="md:w-72 border-t md:border-t-0 md:border-l border-pink-100 bg-white/70 backdrop-blur-xl flex flex-col flex-shrink-0 max-h-52 md:max-h-none">
+        {/* Right: Pronunciation + Correction panel */}
+        <div className="md:w-72 border-t md:border-t-0 md:border-l border-pink-100 bg-white/70 backdrop-blur-xl flex flex-col flex-shrink-0 max-h-52 md:max-h-none overflow-y-auto">
+          {/* Pronunciation assessment panel */}
+          {(pronLoading || pronResult) && (
+            <div className="m-3 bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-4
+              shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-gray-700">🎙️ Pronunciation</p>
+                {usageInfo && usageInfo.daily_limit < 999 && (
+                  <span className="text-xs text-gray-400">{usageInfo.used_today}/{usageInfo.daily_limit} today</span>
+                )}
+              </div>
+              {pronLoading ? (
+                <p className="text-xs text-gray-400">Analyzing...</p>
+              ) : pronResult ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {[
+                      { label: 'Accuracy', val: pronResult.overall.accuracy },
+                      { label: 'Fluency', val: pronResult.overall.fluency },
+                      { label: 'Overall', val: pronResult.overall.pron_score },
+                    ].map(s => (
+                      <div key={s.label} className="text-center bg-white/30 rounded-xl p-2">
+                        <p className={`text-lg font-bold ${s.val >= 80 ? 'text-green-500' : s.val >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                          {s.val}
+                        </p>
+                        <p className="text-xs text-gray-400">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {pronResult.words.filter(w => w.error_type !== 'None' || w.accuracy < 70).length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-1">Words to improve:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {pronResult.words
+                          .filter(w => w.error_type !== 'None' || w.accuracy < 70)
+                          .map((w, i) => (
+                            <span key={i} className="text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-lg px-2 py-0.5">
+                              {w.word} ({w.accuracy})
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+          )}
           <div className="px-4 py-3 border-b border-pink-100">
             <h2 className="text-sm font-semibold text-gray-600">Grammar Check</h2>
           </div>
@@ -399,6 +519,34 @@ function PracticeContent({ scene }: { scene: string }) {
           </div>
         </div>
       </div>
+
+      {/* Upgrade modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-8 max-w-sm mx-4 text-center
+            shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
+            <p className="text-2xl mb-2">🎙️</p>
+            <h3 className="font-bold text-gray-800 text-lg mb-2">每日免费次数用完了</h3>
+            <p className="text-sm text-gray-500 mb-5">升级 Pro 会员，发音评测无限次 · ¥6.9/月</p>
+            <a
+              href={process.env.NEXT_PUBLIC_AFDIAN_URL ?? 'https://ifdian.net/a/aienglishcoach'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full py-3 rounded-xl font-semibold text-white text-sm mb-3
+                bg-gradient-to-r from-rose-400 to-pink-500
+                shadow-[0_4px_20px_rgba(244,63,94,0.35)]"
+            >
+              去爱发电升级 Pro →
+            </a>
+            <button
+              onClick={() => setShowUpgradeModal(false)}
+              className="text-sm text-gray-400 hover:text-gray-600"
+            >
+              稍后再说
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

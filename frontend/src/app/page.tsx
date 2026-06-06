@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SignInButton, UserButton, useAuth } from '@clerk/nextjs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -61,6 +62,7 @@ const HOW_TO_USE = [
 
 export default function HomePage() {
   const router = useRouter()
+  const { isSignedIn } = useAuth()
   const [selected, setSelected] = useState(SCENES[0])
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
   const [loading, setLoading] = useState(false)
@@ -115,10 +117,25 @@ export default function HomePage() {
               className="text-sm text-gray-500 hover:text-rose-500 transition-colors">
               History
             </Link>
+            {isSignedIn && (
+              <Link href="/settings" className="text-sm text-gray-500 hover:text-rose-500 transition-colors">
+                Pro
+              </Link>
+            )}
             <Link href="/assessment"
               className="text-sm bg-white/30 backdrop-blur-xl border border-white/50 text-rose-500 font-medium px-4 py-1.5 rounded-full hover:bg-white/50 transition-all">
               📊 Speaking Test
             </Link>
+            {!isSignedIn && (
+              <SignInButton mode="modal">
+                <button className="text-sm bg-white/30 backdrop-blur-xl border border-white/50 text-rose-500 font-medium px-4 py-1.5 rounded-full hover:bg-white/50 transition-all">
+                  登录
+                </button>
+              </SignInButton>
+            )}
+            {isSignedIn && (
+              <UserButton appearance={{ elements: { avatarBox: 'w-8 h-8' } }} />
+            )}
           </div>
         </div>
       </header>

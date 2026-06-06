@@ -92,4 +92,26 @@ async def init_db():
             await db.commit()
         except Exception:
             pass
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS pronunciation_usage (
+                user_id     TEXT NOT NULL,
+                date        TEXT NOT NULL,
+                count       INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, date)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS pro_users (
+                clerk_user_id   TEXT PRIMARY KEY,
+                afdian_user_id  TEXT,
+                created_at      TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS afdian_orders (
+                afdian_user_id  TEXT PRIMARY KEY,
+                paid_at         TEXT NOT NULL,
+                linked          INTEGER DEFAULT 0
+            )
+        """)
         await db.commit()

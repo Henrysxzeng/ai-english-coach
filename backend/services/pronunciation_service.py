@@ -44,8 +44,12 @@ async def assess_pronunciation(
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(url, content=audio_bytes, headers=headers)
             if resp.status_code != 200:
-                return _fallback(f"azure_{resp.status_code}: {resp.text[:200]}")
+                return _fallback(f"azure_{resp.status_code}: {resp.text[:300]}")
             data = resp.json()
+            # return raw azure response for debugging
+            recognition_status = data.get("RecognitionStatus", "unknown")
+            if recognition_status != "Success":
+                return _fallback(f"RecognitionStatus={recognition_status} raw={str(data)[:300]}")
     except Exception as e:
         return _fallback(str(e)[:200])
 

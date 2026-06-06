@@ -170,33 +170,36 @@ function PracticeContent({ scene }: { scene: string }) {
   }, [])
 
   const handleMicClick = useCallback(() => {
-    // Stop recording if already listening
-    if (isListening) {
-      if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop()
-      return
-    }
+    if (isListening) { recognitionRef.current?.stop(); return }
     if (typeof window === 'undefined') return
-
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      audioChunksRef.current = []
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm'
-      const mr = new MediaRecorder(stream, { mimeType })
-      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-      mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop())
-        setIsListening(false)
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
-        if (audioBlob.size < 500) { setStatusText('Too short — try again'); return }
-        await sendPronunciationAssessAndChat(audioBlob, mimeType)
-      }
-      mr.start(100)
-      mediaRecorderRef.current = mr
-      recordingStartRef.current = Date.now()
-      setIsListening(true)
-      setStatusText('Recording… (click to stop)')
-    }).catch(() => { setStatusText('Microphone access denied') })
+    const SpeechRecognitionAPI: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognitionAPI) { setStatusText('Speech recognition not supported — please use Chrome'); return }
+    const recognition: any = new SpeechRecognitionAPI()
+    recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
+    recognitionRef.current = recognition
+    let accumulatedText = ''
+    recognition.onstart = () => {
+      accumulatedText = ''; recordingStartRef.current = Date.now()
+      setIsListening(true); setStatusText('Listening… (click to stop)')
+    }
+    recognition.onend = () => {
+      setIsListening(false)
+      const text = accumulatedText.trim(); accumulatedText = ''
+      if (!text) return
+      if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
+      if (recordingMode === 'manual') { setPendingText(text); setStatusText('Review your message, then click Send ✉️'); return }
+      sendMessage(text)
+    }
+    recognition.onerror = (e: any) => {
+      setIsListening(false); accumulatedText = ''
+      if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
+    }
+    recognition.onresult = (e: any) => {
+      let text = ''
+      for (let i = 0; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript }
+      accumulatedText = text
+    }
+    try { recognition.start() } catch { setStatusText('Could not start recognition') }
   }, [isListening, recordingMode, sendMessage])
 
   async function fetchUsage() {
@@ -209,38 +212,47 @@ function PracticeContent({ scene }: { scene: string }) {
     } catch {}
   }
 
-  async function sendPronunciationAssessAndChat(audioBlob: Blob, mimeType: string) {
-    setPronLoading(true)
-    setStatusText('Analyzing speech...')
-    try {
-      const token = await getToken()
-      const headers: Record<string, string> = {}
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'recording.webm')
-      const res = await fetch(`${API_URL}/api/pronunciation-assess`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      })
-      if (res.status === 429) { setShowUpgradeModal(true); setStatusText('Click mic to speak'); return }
-      if (res.ok) {
-        const data = await res.json()
-        setPronResult(data)
-        fetchUsage()
-        const transcript = (data.transcript || '').trim()
-        if (!transcript) { setStatusText('Could not hear speech — try again'); return }
-        if (recordingMode === 'manual') {
-          setPendingText(transcript)
-          setStatusText('Review your message, then click Send ✉️')
-        } else {
-          sendMessage(transcript)
-        }
-      } else {
-        setStatusText('Click mic to speak')
+  const [isPronRecording, setIsPronRecording] = useState(false)
+  const pronRecorderRef = useRef<MediaRecorder | null>(null)
+
+  async function handlePronMicClick() {
+    if (isPronRecording) {
+      pronRecorderRef.current?.stop()
+      return
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      const chunks: Blob[] = []
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+      const mr = new MediaRecorder(stream, { mimeType })
+      mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setIsPronRecording(false)
+        const blob = new Blob(chunks, { type: mimeType })
+        console.log('[Pron] blob size:', blob.size)
+        if (blob.size < 500) return
+        setPronLoading(true)
+        try {
+          const token = await getToken()
+          const headers: Record<string, string> = {}
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const formData = new FormData()
+          formData.append('audio', blob, 'recording.webm')
+          const res = await fetch(`${API_URL}/api/pronunciation-assess`, { method: 'POST', headers, body: formData })
+          if (res.status === 429) { setShowUpgradeModal(true); return }
+          if (res.ok) {
+            const data = await res.json()
+            if (data.error) console.error('[Pron] Azure error:', data.error)
+            setPronResult(data)
+            fetchUsage()
+          }
+        } catch {}
+        finally { setPronLoading(false) }
       }
-    } catch { setStatusText('Click mic to speak') }
-    finally { setPronLoading(false) }
+      mr.start(100)
+      pronRecorderRef.current = mr
+      setIsPronRecording(true)
+    }).catch(() => {})
   }
 
   const handleEndPractice = async () => {
@@ -433,51 +445,62 @@ function PracticeContent({ scene }: { scene: string }) {
         {/* Right: Pronunciation + Correction panel */}
         <div className="md:w-72 border-t md:border-t-0 md:border-l border-pink-100 bg-white/70 backdrop-blur-xl flex flex-col flex-shrink-0 max-h-52 md:max-h-none overflow-y-auto">
           {/* Pronunciation assessment panel */}
-          {(pronLoading || pronResult) && (
-            <div className="m-3 bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-4
-              shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-gray-700">🎙️ Pronunciation</p>
-                {usageInfo && usageInfo.daily_limit < 999 && (
-                  <span className="text-xs text-gray-400">{usageInfo.used_today}/{usageInfo.daily_limit} today</span>
+          <div className="m-3 bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-4
+            shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-gray-700">🎙️ Pronunciation</p>
+              {usageInfo && usageInfo.daily_limit < 999 && (
+                <span className="text-xs text-gray-400">{usageInfo.used_today}/{usageInfo.daily_limit} today</span>
+              )}
+            </div>
+            {!pronLoading && !pronResult && (
+              <button
+                onClick={handlePronMicClick}
+                className={`w-full py-2 rounded-xl text-xs font-medium transition-all ${
+                  isPronRecording
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : 'bg-white/40 border border-white/60 text-gray-500 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200'
+                }`}
+              >
+                {isPronRecording ? '⏹ Stop Recording' : '🎤 Record & Assess Pronunciation'}
+              </button>
+            )}
+            {pronLoading ? (
+              <p className="text-xs text-gray-400">Analyzing...</p>
+            ) : pronResult ? (
+              <div>
+                <button onClick={() => setPronResult(null)} className="text-xs text-gray-400 hover:text-rose-400 mb-2 block">↩ Record again</button>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {[
+                    { label: 'Accuracy', val: pronResult.overall.accuracy },
+                    { label: 'Fluency', val: pronResult.overall.fluency },
+                    { label: 'Overall', val: pronResult.overall.pron_score },
+                  ].map(s => (
+                    <div key={s.label} className="text-center bg-white/30 rounded-xl p-2">
+                      <p className={`text-lg font-bold ${s.val >= 80 ? 'text-green-500' : s.val >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                        {s.val}
+                      </p>
+                      <p className="text-xs text-gray-400">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                {pronResult.words.filter(w => w.error_type !== 'None' || w.accuracy < 70).length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1">Words to improve:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {pronResult.words
+                        .filter(w => w.error_type !== 'None' || w.accuracy < 70)
+                        .map((w, i) => (
+                          <span key={i} className="text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-lg px-2 py-0.5">
+                            {w.word} ({w.accuracy})
+                          </span>
+                        ))}
+                    </div>
+                  </div>
                 )}
               </div>
-              {pronLoading ? (
-                <p className="text-xs text-gray-400">Analyzing...</p>
-              ) : pronResult ? (
-                <>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {[
-                      { label: 'Accuracy', val: pronResult.overall.accuracy },
-                      { label: 'Fluency', val: pronResult.overall.fluency },
-                      { label: 'Overall', val: pronResult.overall.pron_score },
-                    ].map(s => (
-                      <div key={s.label} className="text-center bg-white/30 rounded-xl p-2">
-                        <p className={`text-lg font-bold ${s.val >= 80 ? 'text-green-500' : s.val >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
-                          {s.val}
-                        </p>
-                        <p className="text-xs text-gray-400">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {pronResult.words.filter(w => w.error_type !== 'None' || w.accuracy < 70).length > 0 && (
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">Words to improve:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {pronResult.words
-                          .filter(w => w.error_type !== 'None' || w.accuracy < 70)
-                          .map((w, i) => (
-                            <span key={i} className="text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-lg px-2 py-0.5">
-                              {w.word} ({w.accuracy})
-                            </span>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : null}
-            </div>
-          )}
+            ) : null}
+          </div>
           <div className="px-4 py-3 border-b border-pink-100">
             <h2 className="text-sm font-semibold text-gray-600">Grammar Check</h2>
           </div>

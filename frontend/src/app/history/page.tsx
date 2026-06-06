@@ -377,7 +377,13 @@ export default function HistoryPage() {
         )}
 
         {/* Back to Home */}
-        <div className="text-center py-2">
+        <div className="text-center py-2 flex items-center justify-center gap-4">
+          <Link
+            href="/vocabulary"
+            className="text-rose-400 hover:text-rose-500 text-sm font-medium transition-colors"
+          >
+            📒 My Vocabulary
+          </Link>
           <Link
             href="/"
             className="text-rose-400 hover:text-rose-500 text-sm font-medium transition-colors"

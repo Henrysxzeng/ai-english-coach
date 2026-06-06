@@ -173,7 +173,7 @@ export default function ReportPage() {
         </div>
 
         {/* 2. Score cards */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <ScoreCard label="Pronunciation" value={report.pronunciation_score ?? 0} suffix="/100" />
           <ScoreCard label="Fluency"        value={report.fluency_score ?? 0}        suffix="/100" />
           <ScoreCard label="Vocabulary"     value={report.vocabulary_score ?? 0}     suffix="/100" />
@@ -288,7 +288,7 @@ export default function ReportPage() {
             <h2 className="font-semibold text-gray-800 mb-4">🎯 Interview Performance</h2>
 
             {/* Communication Score + STAR Coverage */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Communication Score</p>
                 <p className="text-4xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
@@ -319,7 +319,7 @@ export default function ReportPage() {
             )}
 
             {/* Strengths + Improvements */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-sm font-medium text-green-600 mb-2">✅ Strengths</p>
                 <ul className="space-y-1">

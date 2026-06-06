@@ -124,10 +124,10 @@ export default function HomePage() {
       </header>
 
       {/* ── Main two-column layout ── */}
-      <div className="max-w-6xl mx-auto px-6 py-8 flex gap-5 items-start">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-8 flex flex-col md:flex-row gap-5 items-start">
 
         {/* ── Left sidebar ── */}
-        <aside className="w-56 shrink-0 sticky top-24">
+        <aside className="w-full md:w-56 shrink-0 md:sticky md:top-24">
           <nav className="bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl overflow-hidden
             shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
 

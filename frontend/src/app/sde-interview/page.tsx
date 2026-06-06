@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SDE_QUESTIONS, CATEGORY_LABELS, type QuestionCategory } from './questions'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -38,6 +39,8 @@ export default function SdeInterviewPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isUploadingPdf, setIsUploadingPdf] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<QuestionCategory | 'all'>('all')
+  const [showQuestions, setShowQuestions] = useState(false)
 
   async function handleStart() {
     if (!selectedScene || isLoading) return
@@ -79,7 +82,7 @@ export default function SdeInterviewPage() {
         </div>
 
         {/* Sub-scene cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {SUB_SCENES.map((scene) => (
             <button
               key={scene.id}
@@ -152,7 +155,7 @@ export default function SdeInterviewPage() {
                 value={resumeContext}
                 onChange={(e) => setResumeContext(e.target.value)}
                 maxLength={2000}
-                rows={6}
+                rows={4}
                 placeholder="Paste your resume here (optional) — AI will ask relevant project questions..."
                 className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
               />
@@ -199,6 +202,64 @@ export default function SdeInterviewPage() {
               {d === 'easy' ? '🌸 Beginner' : d === 'medium' ? '🌺 Intermediate' : '🔥 Advanced'}
             </button>
           ))}
+        </div>
+
+        {/* Question Bank */}
+        <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl shadow-[0_4px_24px_rgba(244,114,182,0.07)] overflow-hidden">
+          <button
+            onClick={() => setShowQuestions(v => !v)}
+            className="w-full flex items-center justify-between px-6 py-4 text-left"
+          >
+            <div>
+              <p className="font-semibold text-gray-800">📋 Question Bank</p>
+              <p className="text-xs text-gray-400 mt-0.5">28 common SDE behavioral questions to prepare with</p>
+            </div>
+            <span className={`text-rose-400 transition-transform duration-200 ${showQuestions ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+
+          {showQuestions && (
+            <div className="border-t border-pink-100 px-6 pb-6">
+              <div className="flex flex-wrap gap-2 mt-4 mb-4">
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                    selectedCategory === 'all'
+                      ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white'
+                      : 'bg-white border border-pink-100 text-gray-500 hover:border-rose-200'
+                  }`}
+                >All</button>
+                {(Object.keys(CATEGORY_LABELS) as QuestionCategory[]).map(cat => (
+                  <button key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                      selectedCategory === cat
+                        ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white'
+                        : 'bg-white border border-pink-100 text-gray-500 hover:border-rose-200'
+                    }`}
+                  >{CATEGORY_LABELS[cat]}</button>
+                ))}
+              </div>
+
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {SDE_QUESTIONS
+                  .filter(q => selectedCategory === 'all' || q.category === selectedCategory)
+                  .map(q => (
+                    <div key={q.id} className="bg-rose-50/60 border border-rose-100 rounded-xl p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm text-gray-700 leading-snug">{q.question}</p>
+                        <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
+                          q.difficulty === 'easy'   ? 'bg-green-50 text-green-600 border border-green-100' :
+                          q.difficulty === 'medium' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' :
+                                                     'bg-rose-50 text-rose-600 border border-rose-100'
+                        }`}>{q.difficulty}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1.5 italic">💡 {q.hint}</p>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Error banner */}

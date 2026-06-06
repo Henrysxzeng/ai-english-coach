@@ -194,7 +194,7 @@ function PracticeContent({ scene }: { scene: string }) {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="md:h-screen flex flex-col md:overflow-hidden">
       {/* 环境光晕 */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[#f0e0eb]">
         <div className="absolute -top-40 left-1/4   w-[700px] h-[700px] rounded-full bg-pink-400/35  blur-[160px]" />
@@ -205,12 +205,12 @@ function PracticeContent({ scene }: { scene: string }) {
 
       {/* ── Header ────────────────────────────────── */}
       <header className="bg-white/15 backdrop-blur-2xl border-b border-white/30 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center gap-3">
           <Link href="/" className="text-gray-400 hover:text-rose-400 transition-colors text-sm">← Home</Link>
           <span className="text-pink-200">|</span>
-          <span className="text-gray-700 font-medium text-sm">{SCENE_LABELS[scene] ?? scene}</span>
+          <span className="text-gray-700 font-medium text-sm truncate max-w-[120px] sm:max-w-none">{SCENE_LABELS[scene] ?? scene}</span>
           {difficulty && (
-            <span className="bg-rose-50 text-rose-500 border border-rose-200 rounded-full px-3 py-0.5 text-xs font-medium">
+            <span className="hidden sm:inline-flex bg-rose-50 text-rose-500 border border-rose-200 rounded-full px-3 py-0.5 text-xs font-medium">
               {difficulty === 'easy' ? 'Beginner' : difficulty === 'hard' ? 'Advanced' : 'Intermediate'}
             </span>
           )}
@@ -238,10 +238,10 @@ function PracticeContent({ scene }: { scene: string }) {
       )}
 
       {/* ── Body ──────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row md:flex-1 md:overflow-hidden">
         {/* Left: Chat bubbles */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="md:flex-1 flex flex-col min-w-0">
+          <div className="md:flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-72 md:min-h-0">
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center text-gray-400">
@@ -359,11 +359,11 @@ function PracticeContent({ scene }: { scene: string }) {
         </div>
 
         {/* Right: Correction panel */}
-        <div className="w-72 border-l border-pink-100 bg-white/70 backdrop-blur-xl flex flex-col flex-shrink-0">
+        <div className="md:w-72 border-t md:border-t-0 md:border-l border-pink-100 bg-white/70 backdrop-blur-xl flex flex-col flex-shrink-0 max-h-52 md:max-h-none">
           <div className="px-4 py-3 border-b border-pink-100">
             <h2 className="text-sm font-semibold text-gray-600">Grammar Check</h2>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="overflow-y-auto p-4 md:flex-1">
             {correction && correction.has_error ? (
               <div className="space-y-3">
                 <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">

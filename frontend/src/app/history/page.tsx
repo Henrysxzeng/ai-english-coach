@@ -1,4 +1,4 @@
-// file: src/app/history/page.tsx
+// file: src/app/history/page.tsx — TASK-033-B pink redesign
 // owner: Frontend Engineer
 'use client'
 
@@ -20,16 +20,28 @@ interface HistoryItem {
 }
 
 const SCENE_ICONS: Record<string, string> = {
-  interview: '💼',
-  restaurant: '🍽️',
-  meeting: '📊',
+  interview:        '💼',
+  restaurant:       '🍽️',
+  meeting:          '📊',
+  hospital:         '🏥',
+  phone_call:       '📞',
+  customer_service: '🎧',
+  sde_behavioral:   '🗣',
+  sde_project:      '💼',
+  sde_thinking:     '🧠',
 }
 
 const TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'interview', label: 'Interview' },
-  { id: 'restaurant', label: 'Restaurant' },
-  { id: 'meeting', label: 'Meeting' },
+  { id: 'all',              label: 'All' },
+  { id: 'interview',        label: 'Interview' },
+  { id: 'restaurant',       label: 'Restaurant' },
+  { id: 'meeting',          label: 'Meeting' },
+  { id: 'hospital',         label: 'Hospital' },
+  { id: 'phone_call',       label: 'Phone Call' },
+  { id: 'customer_service', label: 'Customer Service' },
+  { id: 'sde_behavioral',   label: 'SDE Behavioral' },
+  { id: 'sde_project',      label: 'SDE Project' },
+  { id: 'sde_thinking',     label: 'SDE Thinking' },
 ]
 
 // ─── Chart constants ───────────────────────────────────────────────────────────
@@ -46,9 +58,9 @@ function toY(score: number) {
 }
 
 const CHART_LINES: { key: keyof HistoryItem; label: string; color: string }[] = [
-  { key: 'overall_score',  label: 'Overall',   color: '#3b82f6' },
-  { key: 'clarity_score',  label: 'Clarity',   color: '#22c55e' },
-  { key: 'structure_score', label: 'Structure', color: '#a855f7' },
+  { key: 'overall_score',   label: 'Overall',   color: '#f43f5e' },
+  { key: 'clarity_score',   label: 'Clarity',   color: '#fb7185' },
+  { key: 'structure_score', label: 'Structure', color: '#fda4af' },
 ]
 
 // ─── Line chart ────────────────────────────────────────────────────────────────
@@ -72,7 +84,7 @@ function LineChart({ data }: { data: HistoryItem[] }) {
           const y = toY(val)
           return (
             <g key={val}>
-              <line x1={PAD} y1={y} x2={PAD + W} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+              <line x1={PAD} y1={y} x2={PAD + W} y2={y} stroke="#fce7f3" strokeWidth="1" />
               <text
                 x={PAD - 8}
                 y={y + 4}
@@ -87,8 +99,8 @@ function LineChart({ data }: { data: HistoryItem[] }) {
         })}
 
         {/* Axes */}
-        <line x1={PAD} y1={PAD} x2={PAD} y2={PAD + H} stroke="#e5e7eb" strokeWidth="1" />
-        <line x1={PAD} y1={PAD + H} x2={PAD + W} y2={PAD + H} stroke="#e5e7eb" strokeWidth="1" />
+        <line x1={PAD} y1={PAD} x2={PAD} y2={PAD + H} stroke="#fce7f3" strokeWidth="1" />
+        <line x1={PAD} y1={PAD + H} x2={PAD + W} y2={PAD + H} stroke="#fce7f3" strokeWidth="1" />
 
         {/* X axis labels */}
         {data.map((_, i) => (
@@ -176,7 +188,6 @@ export default function HistoryPage() {
         return r.json()
       })
       .then((data: HistoryItem[]) => {
-        // Sort newest first for the list; chart will reverse to get oldest-first
         const sorted = [...data].sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         )
@@ -189,20 +200,31 @@ export default function HistoryPage() {
       })
   }, [])
 
+  const GlowBg = () => (
+    <div className="pointer-events-none fixed inset-0 -z-10 bg-[#f0e0eb]">
+      <div className="absolute -top-40 left-1/4   w-[700px] h-[700px] rounded-full bg-pink-400/35  blur-[160px]" />
+      <div className="absolute bottom-0  right-1/4  w-[600px] h-[600px] rounded-full bg-rose-400/30  blur-[140px]" />
+      <div className="absolute top-1/3  -right-32   w-[500px] h-[500px] rounded-full bg-purple-300/20 blur-[130px]" />
+      <div className="absolute top-1/4  -left-32    w-[450px] h-[450px] rounded-full bg-pink-300/25  blur-[120px]" />
+    </div>
+  )
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      <div className="relative min-h-screen overflow-hidden flex items-center justify-center">
+        <GlowBg />
+        <div className="w-8 h-8 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="relative min-h-screen overflow-hidden flex items-center justify-center">
+        <GlowBg />
         <div className="text-center space-y-4">
-          <p className="text-red-500 text-sm">Failed to load history: {error}</p>
-          <Link href="/" className="text-indigo-600 hover:underline text-sm">
+          <p className="text-rose-500 text-sm">Failed to load history: {error}</p>
+          <Link href="/" className="text-rose-400 hover:text-rose-500 text-sm transition-colors">
             ← Back to Home
           </Link>
         </div>
@@ -210,17 +232,18 @@ export default function HistoryPage() {
     )
   }
 
-  // Newest-first for list; reverse for chart (oldest → newest = left → right)
   const filtered = activeTab === 'all' ? allData : allData.filter((d) => d.scene === activeTab)
   const chartData = [...filtered].reverse()
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-10 px-4">
+    <main className="relative min-h-screen overflow-hidden py-10 px-4">
+      <GlowBg />
+
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Title */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-1">Practice History</h1>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-400 text-sm">
             {allData.length} session{allData.length !== 1 ? 's' : ''} total
           </p>
         </div>
@@ -231,10 +254,10 @@ export default function HistoryPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 activeTab === tab.id
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-indigo-50 border border-gray-200'
+                  ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-[0_2px_10px_rgba(244,63,94,0.25)]'
+                  : 'bg-white border border-pink-100 text-gray-500 hover:border-rose-200'
               }`}
             >
               {tab.label}
@@ -243,7 +266,7 @@ export default function HistoryPage() {
         </div>
 
         {/* Line chart */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="font-semibold text-gray-800">Score Progress</h2>
             {chartData.length >= 2 && (
@@ -257,16 +280,16 @@ export default function HistoryPage() {
 
         {/* History list */}
         {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 shadow-sm text-center text-gray-400 text-sm">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-8 shadow-[0_4px_24px_rgba(244,114,182,0.07)] text-center text-gray-400 text-sm">
             No sessions yet. Start practicing to see your history!
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl shadow-[0_4px_24px_rgba(244,114,182,0.07)] overflow-hidden">
             {filtered.map((item, i) => (
               <div
                 key={item.session_id}
                 className={`px-6 py-4 flex items-center gap-4 ${
-                  i < filtered.length - 1 ? 'border-b border-gray-50' : ''
+                  i < filtered.length - 1 ? 'border-b border-pink-100/60' : ''
                 }`}
               >
                 <div className="text-2xl flex-shrink-0">
@@ -275,16 +298,16 @@ export default function HistoryPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-sm font-medium text-gray-800 capitalize">
-                      {item.scene}
+                      {item.scene.replace(/_/g, ' ')}
                     </span>
                     {i === 0 && (
-                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-full">
+                      <span className="px-2 py-0.5 bg-rose-50 text-rose-500 border border-rose-200 text-xs font-semibold rounded-full">
                         Latest
                       </span>
                     )}
                   </div>
                   {item.topic && (
-                    <p className="text-xs text-indigo-500 font-medium truncate">
+                    <p className="text-xs text-rose-400 font-medium truncate">
                       📌 {item.topic}
                     </p>
                   )}
@@ -299,22 +322,22 @@ export default function HistoryPage() {
                 <div className="flex items-center gap-4 text-right flex-shrink-0">
                   <div>
                     <p className="text-xs text-gray-400">Overall</p>
-                    <p className="text-sm font-bold text-gray-800">
+                    <p className="text-sm font-bold text-rose-500">
                       {Math.round(item.overall_score)}
                     </p>
                   </div>
                   {item.clarity_score != null && (
-                    <div>
+                    <div className="hidden sm:block">
                       <p className="text-xs text-gray-400">Clarity</p>
-                      <p className="text-sm font-bold text-green-600">
+                      <p className="text-sm font-bold text-rose-400">
                         {Math.round(item.clarity_score)}
                       </p>
                     </div>
                   )}
                   {item.structure_score != null && (
-                    <div>
+                    <div className="hidden sm:block">
                       <p className="text-xs text-gray-400">Structure</p>
-                      <p className="text-sm font-bold text-purple-600">
+                      <p className="text-sm font-bold text-pink-400">
                         {Math.round(item.structure_score)}
                       </p>
                     </div>
@@ -329,7 +352,7 @@ export default function HistoryPage() {
         <div className="text-center py-2">
           <Link
             href="/"
-            className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm transition-colors"
+            className="text-rose-400 hover:text-rose-500 text-sm font-medium transition-colors"
           >
             ← Back to Home
           </Link>

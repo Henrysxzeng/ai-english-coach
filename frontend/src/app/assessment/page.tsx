@@ -188,7 +188,7 @@ export default function AssessmentPage() {
 
       {/* ── Header ────────────────────────────────── */}
       <header className="bg-white/15 backdrop-blur-2xl border-b border-white/30 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center gap-3">
           <h1 className="text-base font-semibold text-gray-800">📊 Speaking Test</h1>
           <span className="text-pink-200">|</span>
           <span className="text-sm text-gray-500">Turn {turnCount} of {MAX_TURNS}</span>
@@ -206,7 +206,7 @@ export default function AssessmentPage() {
 
       {/* ── Progress bar ──────────────────────────── */}
       <div className="bg-white/70 backdrop-blur-sm border-b border-pink-50 px-6 py-2">
-        <div className="flex items-center gap-2 max-w-6xl mx-auto">
+        <div className="flex items-center gap-2 max-w-6xl mx-auto px-4 md:px-6">
           <div className="flex-1 bg-rose-100/50 rounded-full h-1.5 overflow-hidden">
             <div
               className="bg-gradient-to-r from-rose-400 to-pink-500 h-full rounded-full transition-all duration-500"
@@ -219,7 +219,7 @@ export default function AssessmentPage() {
 
       {/* ── Chat area ─────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
           {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-gray-400">

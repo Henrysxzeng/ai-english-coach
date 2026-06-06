@@ -1,5 +1,5 @@
 from datetime import date as _date
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException
+from fastapi import APIRouter, Form, Request, UploadFile, File, HTTPException
 import aiosqlite
 from models.db import DB_PATH
 from services.pronunciation_service import assess_pronunciation
@@ -45,6 +45,7 @@ async def _is_db_pro(clerk_user_id: str) -> bool:
 async def pronunciation_assess(
     request: Request,
     audio: UploadFile = File(...),
+    duration_ms: int = Form(0),
 ):
     today = str(_date.today())
     auth_header = request.headers.get("Authorization")
@@ -78,7 +79,7 @@ async def pronunciation_assess(
 
     audio_bytes = await audio.read()
     content_type = audio.content_type or "audio/webm;codecs=opus"
-    result = await assess_pronunciation(audio_bytes, content_type)
+    result = await assess_pronunciation(audio_bytes, content_type, duration_ms)
     return result
 
 

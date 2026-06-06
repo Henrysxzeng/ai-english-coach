@@ -62,8 +62,9 @@ function PracticeContent({ scene }: { scene: string }) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const [pronResult, setPronResult] = useState<{
-    overall: { accuracy: number; fluency: number; pron_score: number }
+    overall: { accuracy: number; fluency: number; expression: number }
     words: Array<{ word: string; accuracy: number; error_type: string }>
+    expression_comment?: string
   } | null>(null)
   const [pronLoading, setPronLoading] = useState(false)
   const [usageInfo, setUsageInfo] = useState<{
@@ -189,12 +190,14 @@ function PracticeContent({ scene }: { scene: string }) {
         setStatusText('Analyzing speech...')
         setPronLoading(true)
         try {
+          const durationMs = Date.now() - recordingStartRef.current
           const wavBlob = await blobToWav(webmBlob)
           const token = await getToken()
           const headers: Record<string, string> = {}
           if (token) headers['Authorization'] = `Bearer ${token}`
           const formData = new FormData()
           formData.append('audio', wavBlob, 'recording.wav')
+          formData.append('duration_ms', String(durationMs))
           const res = await fetch(`${API_URL}/api/pronunciation-assess`, { method: 'POST', headers, body: formData })
           if (res.status === 429) { setShowUpgradeModal(true); setStatusText('Click mic to speak'); return }
           if (res.ok) {
@@ -509,17 +512,27 @@ function PracticeContent({ scene }: { scene: string }) {
             ) : pronResult ? (
               <div>
                 <button onClick={() => setPronResult(null)} className="text-xs text-gray-400 hover:text-rose-400 mb-2 block">↩ Record again</button>
-                <div className="flex items-center gap-3 mb-3 bg-white/30 rounded-xl p-3">
-                  <p className={`text-3xl font-bold ${pronResult.overall.accuracy >= 80 ? 'text-green-500' : pronResult.overall.accuracy >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
-                    {pronResult.overall.accuracy}
-                  </p>
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Accuracy</p>
-                    <p className="text-xs text-gray-400">
-                      {pronResult.overall.accuracy >= 90 ? 'Excellent' : pronResult.overall.accuracy >= 75 ? 'Good' : pronResult.overall.accuracy >= 60 ? 'Needs work' : 'Keep practicing'}
-                    </p>
-                  </div>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {[
+                    { label: 'Accuracy', val: pronResult.overall.accuracy, tip: '发音准确度' },
+                    { label: 'Fluency', val: pronResult.overall.fluency, tip: '语速流畅度' },
+                    { label: 'Expression', val: pronResult.overall.expression, tip: '用词表达力' },
+                  ].map(s => (
+                    <div key={s.label} className="text-center bg-white/30 rounded-xl p-2">
+                      {s.val > 0 ? (
+                        <p className={`text-lg font-bold ${s.val >= 80 ? 'text-green-500' : s.val >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                          {s.val}
+                        </p>
+                      ) : (
+                        <p className="text-lg font-bold text-gray-300">—</p>
+                      )}
+                      <p className="text-xs text-gray-400">{s.label}</p>
+                    </div>
+                  ))}
                 </div>
+                {pronResult.expression_comment && (
+                  <p className="text-xs text-blue-500 bg-blue-50 rounded-lg px-2 py-1 mb-2">{pronResult.expression_comment}</p>
+                )}
                 {pronResult.words.filter(w => w.error_type !== 'None' || w.accuracy < 70).length > 0 && (
                   <div>
                     <p className="text-xs text-gray-400 mb-1">Words to improve (click to hear):</p>

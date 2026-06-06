@@ -27,7 +27,8 @@ function speak(text: string) {
     || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('google'))
     || voices.find(v => v.lang === 'en-US')
   if (preferred) utt.voice = preferred
-  window.speechSynthesis.speak(utt)
+  // Chrome bug: cancel() + speak() in same tick can silently fail
+  setTimeout(() => window.speechSynthesis.speak(utt), 50)
 }
 
 export default function WordTooltip({ children, className }: Props) {
@@ -117,6 +118,8 @@ export default function WordTooltip({ children, className }: Props) {
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="font-semibold text-gray-800 text-sm truncate">{tooltip.word}</span>
                   <button
+                    onMouseDown={e => e.stopPropagation()}
+                    onMouseUp={e => e.stopPropagation()}
                     onClick={() => speak(tooltip.word)}
                     className="text-rose-400 hover:text-rose-600 text-base shrink-0"
                     title="Play pronunciation"

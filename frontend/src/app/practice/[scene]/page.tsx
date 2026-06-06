@@ -510,29 +510,40 @@ function PracticeContent({ scene }: { scene: string }) {
               <div>
                 <button onClick={() => setPronResult(null)} className="text-xs text-gray-400 hover:text-rose-400 mb-2 block">↩ Record again</button>
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  {[
-                    { label: 'Accuracy', val: pronResult.overall.accuracy },
-                    { label: 'Fluency', val: pronResult.overall.fluency },
-                    { label: 'Overall', val: pronResult.overall.pron_score },
-                  ].map(s => (
-                    <div key={s.label} className="text-center bg-white/30 rounded-xl p-2">
-                      <p className={`text-lg font-bold ${s.val >= 80 ? 'text-green-500' : s.val >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
-                        {s.val}
-                      </p>
-                      <p className="text-xs text-gray-400">{s.label}</p>
-                    </div>
-                  ))}
+                  <div className="text-center bg-white/30 rounded-xl p-2">
+                    <p className={`text-lg font-bold ${pronResult.overall.accuracy >= 80 ? 'text-green-500' : pronResult.overall.accuracy >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                      {pronResult.overall.accuracy}
+                    </p>
+                    <p className="text-xs text-gray-400">Accuracy</p>
+                  </div>
+                  <div className="text-center bg-white/30 rounded-xl p-2">
+                    <p className="text-lg font-bold text-gray-300">—</p>
+                    <p className="text-xs text-gray-400">Fluency</p>
+                  </div>
+                  <div className="text-center bg-white/30 rounded-xl p-2">
+                    <p className="text-lg font-bold text-gray-300">—</p>
+                    <p className="text-xs text-gray-400">Overall</p>
+                  </div>
                 </div>
                 {pronResult.words.filter(w => w.error_type !== 'None' || w.accuracy < 70).length > 0 && (
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">Words to improve:</p>
+                    <p className="text-xs text-gray-400 mb-1">Words to improve (click to hear):</p>
                     <div className="flex flex-wrap gap-1">
                       {pronResult.words
                         .filter(w => w.error_type !== 'None' || w.accuracy < 70)
                         .map((w, i) => (
-                          <span key={i} className="text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-lg px-2 py-0.5">
-                            {w.word} ({w.accuracy})
-                          </span>
+                          <button
+                            key={i}
+                            onClick={() => {
+                              window.speechSynthesis.cancel()
+                              const u = new SpeechSynthesisUtterance(w.word)
+                              u.lang = 'en-US'; u.rate = 0.8
+                              window.speechSynthesis.speak(u)
+                            }}
+                            className="text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-lg px-2 py-0.5 hover:bg-rose-100 flex items-center gap-0.5"
+                          >
+                            🔊 {w.word} <span className="text-rose-400">({w.accuracy})</span>
+                          </button>
                         ))}
                     </div>
                   </div>

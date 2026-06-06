@@ -95,6 +95,12 @@ async def _score_with_reference(
         },
         "words": words,
         "transcript": reference_text,
+        "_debug": {
+            "nbest_keys": list(nbest.keys()),
+            "pa_raw": pa,
+            "word0_keys": list(words_raw[0].keys()) if words_raw else [],
+            "word0_raw": words_raw[0] if words_raw else {},
+        },
     }
 
 

@@ -43,6 +43,13 @@ async def assess_pronunciation(
     return azure_result
 
 
+async def transcribe_only(audio_bytes: bytes, content_type: str = "audio/wav") -> str:
+    """对话快速通道：仅转写，不评分、不计额度，降低对话延迟。"""
+    if not AZURE_KEY:
+        return ""
+    return await _get_transcript(audio_bytes, content_type)
+
+
 async def _get_transcript(audio_bytes: bytes, content_type: str) -> str:
     headers = {
         "Ocp-Apim-Subscription-Key": AZURE_KEY,

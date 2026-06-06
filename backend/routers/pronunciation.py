@@ -2,7 +2,7 @@ from datetime import date as _date
 from fastapi import APIRouter, Form, Request, UploadFile, File, HTTPException
 import aiosqlite
 from models.db import DB_PATH
-from services.pronunciation_service import assess_pronunciation
+from services.pronunciation_service import assess_pronunciation, transcribe_only
 from utils.auth import get_clerk_user_id, get_admin_user_ids, get_pro_user_ids
 import os
 
@@ -103,6 +103,15 @@ async def pronunciation_assess(
             pass  # 落库失败不影响评测返回
 
     return result
+
+
+@router.post("/api/transcribe")
+async def transcribe(audio: UploadFile = File(...)):
+    """对话快速通道：仅转写，不评分、不计额度，降低对话延迟。"""
+    audio_bytes = await audio.read()
+    content_type = audio.content_type or "audio/webm;codecs=opus"
+    text = await transcribe_only(audio_bytes, content_type)
+    return {"transcript": text}
 
 
 @router.get("/api/user/status")

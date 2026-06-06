@@ -229,7 +229,11 @@ function PracticeContent({ scene }: { scene: string }) {
         stream.getTracks().forEach(t => t.stop())
         setIsPronRecording(false)
         const blob = new Blob(chunks, { type: mimeType })
-        console.log('[Pron] blob size:', blob.size)
+        console.log('[Pron] blob size:', blob.size, 'type:', mimeType)
+        // DEBUG: auto-download audio so user can verify recording
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a'); a.href = url; a.download = 'pron-debug.webm'; a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 5000)
         if (blob.size < 500) return
         setPronLoading(true)
         try {

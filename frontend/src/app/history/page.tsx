@@ -232,6 +232,18 @@ export default function HistoryPage() {
     )
   }
 
+  // 成长汇总统计（纯前端基于历史数据计算）
+  const totalSessions = allData.length
+  const avgScore = totalSessions ? Math.round(allData.reduce((s, d) => s + (d.overall_score || 0), 0) / totalSessions) : 0
+  const bestScore = totalSessions ? Math.round(Math.max(...allData.map((d) => d.overall_score || 0))) : 0
+  const practiceDays = new Set(allData.map((d) => new Date(d.created_at).toDateString()))
+  let streak = 0
+  {
+    const d = new Date()
+    if (!practiceDays.has(d.toDateString())) d.setDate(d.getDate() - 1)
+    while (practiceDays.has(d.toDateString())) { streak++; d.setDate(d.getDate() - 1) }
+  }
+
   const filtered = activeTab === 'all' ? allData : allData.filter((d) => d.scene === activeTab)
   const chartData = [...filtered].reverse()
 
@@ -242,10 +254,26 @@ export default function HistoryPage() {
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Title */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Practice History</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">Growth Dashboard</h1>
           <p className="text-gray-400 text-sm">
             {allData.length} session{allData.length !== 1 ? 's' : ''} total
           </p>
+        </div>
+
+        {/* 成长汇总 KPI */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { icon: '📚', label: 'Sessions', value: totalSessions },
+            { icon: '⭐', label: 'Avg Score', value: avgScore },
+            { icon: '🏆', label: 'Best', value: bestScore },
+            { icon: '🔥', label: 'Day Streak', value: streak },
+          ].map((s) => (
+            <div key={s.label} className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-4 text-center shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
+              <div className="text-2xl mb-1">{s.icon}</div>
+              <div className="text-2xl font-bold text-rose-500">{s.value}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{s.label}</div>
+            </div>
+          ))}
         </div>
 
         {/* Scene filter tabs */}

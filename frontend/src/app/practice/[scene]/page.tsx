@@ -170,60 +170,32 @@ function PracticeContent({ scene }: { scene: string }) {
   }, [])
 
   const handleMicClick = useCallback(() => {
-    if (isListening) { recognitionRef.current?.stop(); return }
+    // Stop recording if already listening
+    if (isListening) {
+      if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop()
+      return
+    }
     if (typeof window === 'undefined') return
-    const SpeechRecognitionAPI: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognitionAPI) { setStatusText('Speech recognition not supported — please use Chrome'); return }
 
-    // Get mic stream first, then start both MediaRecorder + SpeechRecognition simultaneously
     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
       audioChunksRef.current = []
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/webm'
-      const mr = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 16000 })
+      const mr = new MediaRecorder(stream, { mimeType })
       mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-      mr.start(100) // collect chunks every 100ms
-      mediaRecorderRef.current = mr
-
-      const recognition: any = new SpeechRecognitionAPI()
-      recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
-      recognitionRef.current = recognition
-      let accumulatedText = ''
-
-      recognition.onstart = () => {
-        accumulatedText = ''
-        recordingStartRef.current = Date.now()
-        setIsListening(true)
-        setStatusText('Listening… (click to stop)')
-      }
-      recognition.onend = () => {
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
         setIsListening(false)
-        const text = accumulatedText.trim(); accumulatedText = ''
-        if (mr.state !== 'inactive') {
-          mr.stop()
-          mr.onstop = async () => {
-            stream.getTracks().forEach(t => t.stop())
-            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
-            if (audioBlob.size >= 500) await sendPronunciationAssess(audioBlob)
-          }
-        }
-        if (!text) return
-        if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
-        if (recordingMode === 'manual') { setPendingText(text); setStatusText('Review your message, then click Send ✉️'); return }
-        sendMessage(text)
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
+        if (audioBlob.size < 500) { setStatusText('Too short — try again'); return }
+        await sendPronunciationAssessAndChat(audioBlob, mimeType)
       }
-      recognition.onerror = (e: any) => {
-        setIsListening(false); accumulatedText = ''
-        if (mr.state !== 'inactive') { mr.stop(); stream.getTracks().forEach(t => t.stop()) }
-        if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
-      }
-      recognition.onresult = (e: any) => {
-        let text = ''
-        for (let i = 0; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript }
-        accumulatedText = text
-      }
-      try { recognition.start() } catch { setStatusText('Could not start recognition') }
+      mr.start(100)
+      mediaRecorderRef.current = mr
+      recordingStartRef.current = Date.now()
+      setIsListening(true)
+      setStatusText('Recording… (click to stop)')
     }).catch(() => { setStatusText('Microphone access denied') })
   }, [isListening, recordingMode, sendMessage])
 
@@ -237,8 +209,9 @@ function PracticeContent({ scene }: { scene: string }) {
     } catch {}
   }
 
-  async function sendPronunciationAssess(audioBlob: Blob) {
+  async function sendPronunciationAssessAndChat(audioBlob: Blob, mimeType: string) {
     setPronLoading(true)
+    setStatusText('Analyzing speech...')
     try {
       const token = await getToken()
       const headers: Record<string, string> = {}
@@ -250,14 +223,23 @@ function PracticeContent({ scene }: { scene: string }) {
         headers,
         body: formData,
       })
-      if (res.status === 429) { setShowUpgradeModal(true); return }
+      if (res.status === 429) { setShowUpgradeModal(true); setStatusText('Click mic to speak'); return }
       if (res.ok) {
         const data = await res.json()
-        if (data.error) console.error('[Pronunciation] Azure error:', data.error)
         setPronResult(data)
         fetchUsage()
+        const transcript = (data.transcript || '').trim()
+        if (!transcript) { setStatusText('Could not hear speech — try again'); return }
+        if (recordingMode === 'manual') {
+          setPendingText(transcript)
+          setStatusText('Review your message, then click Send ✉️')
+        } else {
+          sendMessage(transcript)
+        }
+      } else {
+        setStatusText('Click mic to speak')
       }
-    } catch {}
+    } catch { setStatusText('Click mic to speak') }
     finally { setPronLoading(false) }
   }
 

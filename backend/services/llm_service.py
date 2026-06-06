@@ -184,6 +184,23 @@ async def evaluate_correction(user_text: str) -> dict:
         return EMPTY_CORRECTION.copy()
 
 
+async def _get_real_pronunciation(session_id: str):
+    """读取本次会话练习中 Azure 真实发音评测的平均准确度；无记录返回 None。"""
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            cursor = await db.execute(
+                "SELECT accuracy FROM pronunciation_scores WHERE session_id = ? AND accuracy > 0",
+                (session_id,),
+            )
+            rows = await cursor.fetchall()
+        accs = [r[0] for r in rows]
+        if accs:
+            return round(sum(accs) / len(accs), 1)
+    except Exception:
+        pass
+    return None
+
+
 async def generate_report_scores(session_id: str, messages: list, corrections: list) -> dict:
     user_messages = [m["content"] for m in messages if m["role"] == "user"]
 
@@ -220,8 +237,13 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
     else:
         pronunciation_base = 57
 
-    variance = (sum(ord(c) for c in session_id) % 11) - 5
-    pronunciation_score = round(max(50.0, min(95.0, pronunciation_base + variance)), 1)
+    # 优先使用练习时 Azure 真实发音评测的平均分；无记录则回退到文本估算
+    real_pron = await _get_real_pronunciation(session_id)
+    if real_pron is not None:
+        pronunciation_score = real_pron
+    else:
+        variance = (sum(ord(c) for c in session_id) % 11) - 5
+        pronunciation_score = round(max(50.0, min(95.0, pronunciation_base + variance)), 1)
 
     prompt = (
         "You are an English speaking coach. Analyze this practice session and provide honest scores.\n\n"

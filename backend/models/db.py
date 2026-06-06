@@ -101,6 +101,16 @@ async def init_db():
             )
         """)
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS pronunciation_scores (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id  TEXT NOT NULL,
+                accuracy    REAL DEFAULT 0,
+                fluency     REAL DEFAULT 0,
+                expression  REAL DEFAULT 0,
+                created_at  TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS pro_users (
                 clerk_user_id   TEXT PRIMARY KEY,
                 afdian_user_id  TEXT,

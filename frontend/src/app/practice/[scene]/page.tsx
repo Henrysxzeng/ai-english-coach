@@ -45,6 +45,7 @@ function PracticeContent({ scene }: { scene: string }) {
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [correction, setCorrection] = useState<Correction | null>(null)
+  const [upgrade, setUpgrade] = useState<{ has_suggestion: boolean; better: string; reason: string } | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isWaiting, setIsWaiting] = useState(false)
@@ -134,6 +135,7 @@ function PracticeContent({ scene }: { scene: string }) {
             return next
           })
           if (data.correction) setCorrection(data.correction)
+          if (data.upgrade) setUpgrade(data.upgrade)
           if (data.ai_text && typeof window !== 'undefined' && window.speechSynthesis) {
             window.speechSynthesis.cancel()
             const utt = new SpeechSynthesisUtterance(data.ai_text)
@@ -635,6 +637,13 @@ function PracticeContent({ scene }: { scene: string }) {
             <h2 className="text-sm font-semibold text-gray-600">Grammar Check</h2>
           </div>
           <div className="overflow-y-auto p-4 md:flex-1">
+            {upgrade && upgrade.has_suggestion && (
+              <div className="mb-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1.5">💬 更地道的说法</p>
+                <p className="text-sm text-gray-700 font-medium mb-1">&ldquo;{upgrade.better}&rdquo;</p>
+                <p className="text-xs text-gray-500 leading-relaxed">{upgrade.reason}</p>
+              </div>
+            )}
             {correction && correction.has_error ? (
               <div className="space-y-3">
                 <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">

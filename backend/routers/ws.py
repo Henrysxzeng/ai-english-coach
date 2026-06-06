@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import aiosqlite
 from dotenv import load_dotenv
-from services.llm_service import get_ai_response, evaluate_correction, generate_memory_greeting
+from services.llm_service import get_ai_response, evaluate_correction, evaluate_upgrade, generate_memory_greeting
 
 load_dotenv()
 
@@ -112,9 +112,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             # Parallel: correction + AI response, with timeout
             try:
-                correction, ai_text = await asyncio.wait_for(
+                correction, upgrade, ai_text = await asyncio.wait_for(
                     asyncio.gather(
                         evaluate_correction(user_text),
+                        evaluate_upgrade(user_text),
                         get_ai_response(scene, messages, difficulty, resume_context=resume_context, jd_context=jd_context),
                     ),
                     timeout=AI_RESPONSE_TIMEOUT,
@@ -163,6 +164,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 "user_text": user_text,
                 "ai_text": ai_text,
                 "correction": correction,
+                "upgrade": upgrade,
                 "turn_id": turn_id,
             })
 

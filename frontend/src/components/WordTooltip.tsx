@@ -39,6 +39,8 @@ export default function WordTooltip({ children, className }: Props) {
 
   useEffect(() => {
     async function handleMouseUp(e: MouseEvent) {
+      // Clicks inside the tooltip popup must not re-trigger lookup
+      if ((e.target as HTMLElement).closest('[data-tooltip-popup]')) return
       const sel = window.getSelection()
       const raw = sel?.toString().trim() ?? ''
       if (!raw || raw.length < 2) { setTooltip(null); return }
@@ -107,6 +109,7 @@ export default function WordTooltip({ children, className }: Props) {
       {children}
       {(loading || tooltip) && (
         <div
+          data-tooltip-popup
           className="fixed z-50"
           style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, -100%)' }}
         >

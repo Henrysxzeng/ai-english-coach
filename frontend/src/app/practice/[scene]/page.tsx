@@ -170,37 +170,59 @@ function PracticeContent({ scene }: { scene: string }) {
   }, [])
 
   const handleMicClick = useCallback(() => {
-    if (isListening) { recognitionRef.current?.stop(); return }
+    // If recording, stop
+    if (isListening) {
+      pronRecorderRef.current?.stop()
+      return
+    }
     if (typeof window === 'undefined') return
-    const SpeechRecognitionAPI: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognitionAPI) { setStatusText('Speech recognition not supported — please use Chrome'); return }
-    const recognition: any = new SpeechRecognitionAPI()
-    recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
-    recognitionRef.current = recognition
-    let accumulatedText = ''
-    recognition.onstart = () => {
-      accumulatedText = ''; recordingStartRef.current = Date.now()
-      setIsListening(true); setStatusText('Listening… (click to stop)')
-    }
-    recognition.onend = () => {
-      setIsListening(false)
-      const text = accumulatedText.trim(); accumulatedText = ''
-      if (!text) return
-      if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
-      if (recordingMode === 'manual') { setPendingText(text); setStatusText('Review your message, then click Send ✉️'); return }
-      sendMessage(text)
-    }
-    recognition.onerror = (e: any) => {
-      setIsListening(false); accumulatedText = ''
-      if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
-    }
-    recognition.onresult = (e: any) => {
-      let text = ''
-      for (let i = 0; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript }
-      accumulatedText = text
-    }
-    try { recognition.start() } catch { setStatusText('Could not start recognition') }
-  }, [isListening, recordingMode, sendMessage])
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      const chunks: Blob[] = []
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+      const mr = new MediaRecorder(stream, { mimeType })
+      mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setIsListening(false)
+        const webmBlob = new Blob(chunks, { type: mimeType })
+        if (webmBlob.size < 500) { setStatusText('Too short — try again'); return }
+        setStatusText('Analyzing speech...')
+        setPronLoading(true)
+        try {
+          const wavBlob = await blobToWav(webmBlob)
+          const token = await getToken()
+          const headers: Record<string, string> = {}
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const formData = new FormData()
+          formData.append('audio', wavBlob, 'recording.wav')
+          const res = await fetch(`${API_URL}/api/pronunciation-assess`, { method: 'POST', headers, body: formData })
+          if (res.status === 429) { setShowUpgradeModal(true); setStatusText('Click mic to speak'); return }
+          if (res.ok) {
+            const data = await res.json()
+            setPronResult(data)
+            fetchUsage()
+            const transcript = (data.transcript || '').trim()
+            if (!transcript) { setStatusText('Could not hear speech — try again'); return }
+            if (/[一-鿿぀-ヿ가-힯]/.test(transcript)) { setStatusText('Please speak in English 🇬🇧'); return }
+            if (recordingMode === 'manual') {
+              setPendingText(transcript)
+              setStatusText('Review your message, then click Send ✉️')
+            } else {
+              sendMessage(transcript)
+            }
+          } else {
+            setStatusText('Click mic to speak')
+          }
+        } catch { setStatusText('Click mic to speak') }
+        finally { setPronLoading(false) }
+      }
+      mr.start(100)
+      pronRecorderRef.current = mr
+      recordingStartRef.current = Date.now()
+      setIsListening(true)
+      setStatusText('Recording… (click mic to stop)')
+    }).catch(() => { setStatusText('Microphone access denied') })
+  }, [isListening, recordingMode, sendMessage, getToken])
 
   async function fetchUsage() {
     try {
@@ -480,16 +502,7 @@ function PracticeContent({ scene }: { scene: string }) {
               )}
             </div>
             {!pronLoading && !pronResult && (
-              <button
-                onClick={handlePronMicClick}
-                className={`w-full py-2 rounded-xl text-xs font-medium transition-all ${
-                  isPronRecording
-                    ? 'bg-rose-500 text-white animate-pulse'
-                    : 'bg-white/40 border border-white/60 text-gray-500 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200'
-                }`}
-              >
-                {isPronRecording ? '⏹ Stop Recording' : '🎤 Record & Assess Pronunciation'}
-              </button>
+              <p className="text-xs text-gray-400 text-center">Scores appear after each turn</p>
             )}
             {pronLoading ? (
               <p className="text-xs text-gray-400">Analyzing...</p>

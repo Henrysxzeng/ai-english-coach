@@ -74,33 +74,32 @@ async def _score_with_reference(
         return _fallback(str(e)[:200])
 
     nbest = data.get("NBest", [{}])[0]
-    pa = nbest.get("PronunciationAssessment", {})
     words_raw = nbest.get("Words", [])
 
+    # Azure REST API returns scores flat on each word, not nested under PronunciationAssessment
     words = [
         {
             "word": w.get("Word", ""),
-            "accuracy": round(w.get("PronunciationAssessment", {}).get("AccuracyScore", 0), 1),
-            "error_type": w.get("PronunciationAssessment", {}).get("ErrorType", "None"),
+            "accuracy": round(w.get("AccuracyScore", 0), 1),
+            "error_type": "None" if w.get("AccuracyScore", 100) >= 60 else "Mispronunciation",
         }
         for w in words_raw
     ]
 
+    # Compute overall from word scores + NBest-level AccuracyScore
+    word_scores = [w["accuracy"] for w in words]
+    avg_acc = round(sum(word_scores) / len(word_scores), 1) if word_scores else 0
+    nbest_acc = round(nbest.get("AccuracyScore", avg_acc), 1)
+
     return {
         "overall": {
-            "accuracy": round(pa.get("AccuracyScore", 0), 1),
-            "fluency": round(pa.get("FluencyScore", 0), 1),
-            "completeness": round(pa.get("CompletenessScore", 100), 1),
-            "pron_score": round(pa.get("PronScore", 0), 1),
+            "accuracy": nbest_acc,
+            "fluency": nbest_acc,   # REST API doesn't expose FluencyScore separately
+            "completeness": 100,
+            "pron_score": nbest_acc,
         },
         "words": words,
         "transcript": reference_text,
-        "_debug": {
-            "nbest_keys": list(nbest.keys()),
-            "pa_raw": pa,
-            "word0_keys": list(words_raw[0].keys()) if words_raw else [],
-            "word0_raw": words_raw[0] if words_raw else {},
-        },
     }
 
 

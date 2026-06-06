@@ -142,15 +142,23 @@ async def _expression_score(transcript: str) -> dict:
             base_url="https://api.deepseek.com",
         )
         prompt = (
-            f'Rate this English spoken response on Expression (vocabulary richness + naturalness).\n'
-            f'Transcript: "{transcript}"\n'
-            f'Reply ONLY with valid JSON: {{"score": <0-100 integer>, "comment": "<one short encouraging tip in Chinese, max 20 chars>"}}\n'
-            f'Scoring: 90-100=excellent varied & natural; 70-89=good; 50-69=basic but clear; <50=very simple/unnatural.'
+            'You are an American English speaking coach. Judge how NATURAL and IDIOMATIC '
+            'this SPOKEN sentence sounds, like a native American speaker in everyday conversation.\n'
+            f'Spoken text: "{transcript}"\n\n'
+            'Scoring principles (IMPORTANT):\n'
+            '- Spoken English is NOT a written essay. Do NOT reward fancy or advanced vocabulary.\n'
+            '- Reward natural, idiomatic, everyday American phrasing. Simple but native-sounding = HIGH score.\n'
+            '- Penalize ONLY awkward phrasing, Chinglish, or wording a native speaker would not use.\n'
+            'Score: 90-100 fully native; 75-89 mostly natural; 60-74 understandable but stiff/non-native; '
+            'below 60 unnatural or Chinglish.\n\n'
+            'Reply ONLY with JSON: {"score": <int 0-100>, "comment": "<中文建议>"}\n'
+            'comment 必须具体：明确指出把哪个词或句子改成什么更地道（用箭头，例如 把 X 改成 Y）。'
+            '注意是更地道、更像美国人日常说法，不是更高级的词汇。若已经很地道就简短肯定。50字以内。'
         )
         resp = await client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=80,
+            max_tokens=160,
             temperature=0.3,
         )
         text = resp.choices[0].message.content.strip()

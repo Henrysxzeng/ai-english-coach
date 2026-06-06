@@ -1,7 +1,9 @@
 ﻿# main.py | backend | v1.0
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from openai import AsyncOpenAI
 from models.db import init_db
 from routers import session, ws, report, history, assessment
 from routers.parse_pdf import router as parse_pdf_router
@@ -38,3 +40,23 @@ app.include_router(afdian_router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/translate")
+async def translate(text: str):
+    if not text or len(text) > 500:
+        return {"translation": ""}
+    client = AsyncOpenAI(
+        api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url="https://api.deepseek.com",
+    )
+    resp = await client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": "Translate the English text to Chinese. Return only the translation, no explanation."},
+            {"role": "user", "content": text},
+        ],
+        max_tokens=300,
+        temperature=0.3,
+    )
+    return {"translation": resp.choices[0].message.content.strip()}

@@ -198,6 +198,7 @@ function PracticeContent({ scene }: { scene: string }) {
           const formData = new FormData()
           formData.append('audio', wavBlob, 'recording.wav')
           formData.append('duration_ms', String(durationMs))
+          formData.append('session_id', sessionId)
           const res = await fetch(`${API_URL}/api/pronunciation-assess`, { method: 'POST', headers, body: formData })
           if (res.status === 429) { setShowUpgradeModal(true); setStatusText('Click mic to speak'); return }
           if (res.ok) {

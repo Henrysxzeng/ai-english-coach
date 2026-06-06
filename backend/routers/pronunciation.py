@@ -46,6 +46,7 @@ async def pronunciation_assess(
     request: Request,
     audio: UploadFile = File(...),
     duration_ms: int = Form(0),
+    session_id: str = Form(""),
 ):
     today = str(_date.today())
     auth_header = request.headers.get("Authorization")
@@ -80,6 +81,27 @@ async def pronunciation_assess(
     audio_bytes = await audio.read()
     content_type = audio.content_type or "audio/webm;codecs=opus"
     result = await assess_pronunciation(audio_bytes, content_type, duration_ms)
+
+    # 落库真实发音分，供课后报告聚合（替代文本估算）
+    overall = result.get("overall", {})
+    if session_id and overall.get("accuracy", 0) > 0:
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute(
+                    "INSERT INTO pronunciation_scores (session_id, accuracy, fluency, expression, created_at) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (
+                        session_id,
+                        overall.get("accuracy", 0),
+                        overall.get("fluency", 0),
+                        overall.get("expression", 0),
+                        str(_date.today()),
+                    ),
+                )
+                await db.commit()
+        except Exception:
+            pass  # 落库失败不影响评测返回
+
     return result
 
 

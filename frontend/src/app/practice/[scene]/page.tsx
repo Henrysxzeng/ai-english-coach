@@ -45,7 +45,7 @@ function PracticeContent({ scene }: { scene: string }) {
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [correction, setCorrection] = useState<Correction | null>(null)
-  const [upgrade, setUpgrade] = useState<{ has_suggestion: boolean; better: string; reason: string } | null>(null)
+  const [upgrade, setUpgrade] = useState<{ has_suggestion: boolean; better: string; reason: string; style_tags?: string[] } | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isWaiting, setIsWaiting] = useState(false)
@@ -654,6 +654,14 @@ function PracticeContent({ scene }: { scene: string }) {
             <h2 className="text-sm font-semibold text-gray-600">Grammar Check</h2>
           </div>
           <div className="overflow-y-auto p-4 md:flex-1">
+            {upgrade && upgrade.style_tags && upgrade.style_tags.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-gray-400">You sound:</span>
+                {upgrade.style_tags.map((t, i) => (
+                  <span key={i} className="text-xs bg-purple-50 border border-purple-200 text-purple-600 rounded-full px-2.5 py-0.5">🗣️ {t}</span>
+                ))}
+              </div>
+            )}
             {upgrade && upgrade.has_suggestion && (
               <div className="mb-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1.5">💬 更地道的说法</p>

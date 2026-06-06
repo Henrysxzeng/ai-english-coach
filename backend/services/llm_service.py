@@ -21,7 +21,10 @@ _HUMAN_STYLE = (
     "Speak like a real American — use contractions (I'm, you're, that's, it's), "
     "natural filler transitions (Sure, Got it, Absolutely, Nice), and vary how you open sentences. "
     "Never sound scripted or robotic. React to what the person actually said before asking the next question. "
-    "Never repeat a question you've already asked."
+    "Never repeat a question you've already asked. "
+    "If their answer is vague, generic, or evasive (e.g. 'it was good', 'because it's healthy'), "
+    "don't just accept it — ask ONE pointed follow-up that pushes them to back it up with a concrete "
+    "detail, example, or reason, like a sharp but fair interviewer would."
 )
 
 SCENE_PROMPTS = {
@@ -222,17 +225,20 @@ async def evaluate_upgrade(user_text: str) -> dict:
         "IMPORTANT: focus on NATURALNESS / idiomatic phrasing, NOT fancy or advanced vocabulary. "
         "If it already sounds natural and native, set has_suggestion to false.\n"
         "Be conservative — only suggest when it genuinely sounds non-native.\n\n"
+        "Also tag the speaker's delivery style.\n"
         "Reply ONLY with JSON:\n"
-        '{"has_suggestion": bool, "better": str, "reason": str}\n'
+        '{"has_suggestion": bool, "better": str, "reason": str, "style_tags": [str]}\n'
         "- better: the more natural native version (empty string if none)\n"
         "- reason: one short sentence in Chinese explaining why it's more natural (empty string if none)\n"
+        "- style_tags: 1-2 short English labels for how they came across, chosen ONLY from: "
+        "Confident, Hesitant, Too generic, Too brief, Clear, Natural, Unnatural. Empty array if unsure.\n"
         "Output only the JSON, nothing else."
     )
     try:
         response = await client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=150,
+            max_tokens=200,
             temperature=0.3,
         )
         text = response.choices[0].message.content.strip()
@@ -241,13 +247,17 @@ async def evaluate_upgrade(user_text: str) -> dict:
             if text.startswith("json"):
                 text = text[4:]
         result = json.loads(text.strip())
+        tags = result.get("style_tags", [])
+        if not isinstance(tags, list):
+            tags = []
         return {
             "has_suggestion": bool(result.get("has_suggestion", False)),
             "better": str(result.get("better", "")),
             "reason": str(result.get("reason", "")),
+            "style_tags": [str(t) for t in tags][:2],
         }
     except Exception:
-        return {"has_suggestion": False, "better": "", "reason": ""}
+        return {"has_suggestion": False, "better": "", "reason": "", "style_tags": []}
 
 
 async def _get_real_pronunciation(session_id: str):

@@ -50,6 +50,15 @@ async def transcribe_only(audio_bytes: bytes, content_type: str = "audio/wav") -
     return await _get_transcript(audio_bytes, content_type)
 
 
+async def assess_shadowing(audio_bytes: bytes, content_type: str, reference_text: str) -> dict:
+    """影子跟读：目标句已知，直接按 ReferenceText 评分（无需先转写）。"""
+    if not AZURE_KEY:
+        return _fallback("no_azure_key")
+    if not reference_text or not reference_text.strip():
+        return _fallback("no_reference")
+    return await _score_with_reference(audio_bytes, content_type, reference_text.strip())
+
+
 async def _get_transcript(audio_bytes: bytes, content_type: str) -> str:
     headers = {
         "Ocp-Apim-Subscription-Key": AZURE_KEY,

@@ -195,30 +195,34 @@ function PracticeContent({ scene }: { scene: string }) {
           const token = await getToken()
           const headers: Record<string, string> = {}
           if (token) headers['Authorization'] = `Bearer ${token}`
-          const formData = new FormData()
-          formData.append('audio', wavBlob, 'recording.wav')
-          formData.append('duration_ms', String(durationMs))
-          formData.append('session_id', sessionId)
-          const res = await fetch(`${API_URL}/api/pronunciation-assess`, { method: 'POST', headers, body: formData })
-          if (res.status === 429) { setShowUpgradeModal(true); setStatusText('Click mic to speak'); return }
-          if (res.ok) {
-            const data = await res.json()
-            setPronResult(data)
-            fetchUsage()
-            const transcript = (data.transcript || '').trim()
-            if (!transcript) { setStatusText('Could not hear speech — try again'); return }
-            if (/[一-鿿぀-ヿ가-힯]/.test(transcript)) { setStatusText('Please speak in English 🇬🇧'); return }
-            if (recordingMode === 'manual') {
-              setPendingText(transcript)
-              setStatusText('Review your message, then click Send ✉️')
-            } else {
-              sendMessage(transcript)
-            }
+
+          // ① 快速转写 → 立即推进对话（不等发音评测，降低端到端延迟）
+          const tForm = new FormData()
+          tForm.append('audio', wavBlob, 'recording.wav')
+          const tRes = await fetch(`${API_URL}/api/transcribe`, { method: 'POST', headers, body: tForm })
+          const transcript = tRes.ok ? (((await tRes.json()).transcript) || '').trim() : ''
+          if (!transcript) { setStatusText('Could not hear speech — try again'); setPronLoading(false); return }
+          if (/[一-鿿぀-ヿ가-힯]/.test(transcript)) { setStatusText('Please speak in English 🇬🇧'); setPronLoading(false); return }
+          if (recordingMode === 'manual') {
+            setPendingText(transcript)
+            setStatusText('Review your message, then click Send ✉️')
           } else {
-            setStatusText('Click mic to speak')
+            sendMessage(transcript)
           }
-        } catch { setStatusText('Click mic to speak') }
-        finally { setPronLoading(false) }
+
+          // ② 发音评测后台并行，完成后更新右侧面板（不阻塞对话）
+          const pForm = new FormData()
+          pForm.append('audio', wavBlob, 'recording.wav')
+          pForm.append('duration_ms', String(durationMs))
+          pForm.append('session_id', sessionId)
+          fetch(`${API_URL}/api/pronunciation-assess`, { method: 'POST', headers, body: pForm })
+            .then(async pRes => {
+              if (pRes.status === 429) { setShowUpgradeModal(true); return }
+              if (pRes.ok) { setPronResult(await pRes.json()); fetchUsage() }
+            })
+            .catch(() => {})
+            .finally(() => setPronLoading(false))
+        } catch { setStatusText('Click mic to speak'); setPronLoading(false) }
       }
       mr.start(100)
       pronRecorderRef.current = mr

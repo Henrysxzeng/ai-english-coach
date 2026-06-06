@@ -23,3 +23,12 @@ Thumbs.db
 
 # Data
 backend/data/
+.vercel
+
+# Logs & build artifacts
+*.log
+*.tsbuildinfo
+next-env.d.ts
+
+# Reference material (large/copyrighted, not for public repo)
+reference/

@@ -150,6 +150,22 @@ function cefrLevel(score: number): { level: string; label: string } {
   return { level: 'A1', label: 'Beginner' }
 }
 
+function coachAdvice(weakAreas: string[], score: number): { nextDiff: string; focuses: string[] } {
+  const nextDiff =
+    score >= 82 ? '试试 Advanced 难度，挑战自己' :
+    score >= 60 ? '保持 Intermediate，巩固稳定性' :
+    '从 Beginner 起步，打好基础'
+  const focusMap: Record<string, string> = {
+    grammar: '语法准确性（注意时态、主谓一致）',
+    clarity: '表达清晰度（把意思说得更具体）',
+    structure: '回答结构（用 总-分-总 或 STAR 框架）',
+    vocabulary: '词汇与地道表达（多用 native 说法）',
+    response_completeness: '回答完整度（多展开细节和例子）',
+  }
+  const focuses = (weakAreas || []).map((w) => focusMap[w]).filter(Boolean)
+  return { nextDiff, focuses }
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ReportPage() {
@@ -288,6 +304,34 @@ export default function ReportPage() {
           {report.structure_score != null && (
             <ScoreCard label="Response Structure" value={report.structure_score} suffix="/100" />
           )}
+        </div>
+
+        {/* 2b. AI 学习教练 */}
+        <div className="bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.08)]">
+          <h2 className="font-semibold text-gray-800 mb-3">🎓 AI 学习教练 · 下一步</h2>
+          {(() => {
+            const advice = coachAdvice(report.weak_areas ?? [], report.overall_score ?? 0)
+            return (
+              <div className="space-y-2 text-sm text-gray-700">
+                <p><span className="text-rose-500 font-medium">难度建议：</span>{advice.nextDiff}</p>
+                {advice.focuses.length > 0 ? (
+                  <div>
+                    <span className="text-rose-500 font-medium">重点突破：</span>
+                    <ul className="mt-1 space-y-1">
+                      {advice.focuses.map((f, i) => (
+                        <li key={i} className="flex items-start gap-2"><span className="text-rose-400 mt-0.5">▸</span><span>{f}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p><span className="text-rose-500 font-medium">重点突破：</span>各维度较均衡，继续保持，挑战更难的场景吧！</p>
+                )}
+              </div>
+            )
+          })()}
+          <Link href="/" className="inline-block mt-4 px-5 py-2 bg-gradient-to-r from-rose-400 to-pink-500 text-white text-sm font-semibold rounded-xl shadow-[0_2px_12px_rgba(244,63,94,0.25)]">
+            开始下一次练习 →
+          </Link>
         </div>
 
         {/* 3. Grammar Corrections */}

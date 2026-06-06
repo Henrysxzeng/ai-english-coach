@@ -59,6 +59,7 @@ function PracticeContent({ scene }: { scene: string }) {
   const [personality, setPersonality] = useState<'friendly' | 'strict' | 'tough'>('friendly')
   const [vocabWords, setVocabWords] = useState<string[]>([])
   const [pendingText, setPendingText] = useState('')
+  const [textInput, setTextInput] = useState('')
   const [difficulty, setDifficulty] = useState<string>('')
 
   const { getToken } = useAuth()
@@ -606,6 +607,21 @@ function PracticeContent({ scene }: { scene: string }) {
             )}
 
             <p className="text-xs text-gray-400 text-center">{statusText}</p>
+
+            {/* 文字输入（母语桥梁：可中英混合打字，不会的词直接用中文）*/}
+            <div className="flex items-center gap-2 w-full max-w-sm mt-1">
+              <input
+                value={textInput}
+                onChange={e => setTextInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && textInput.trim()) { sendMessage(textInput.trim()); setTextInput('') } }}
+                placeholder="或打字…不会的词可直接用中文"
+                className="flex-1 px-3 py-2 rounded-xl border border-pink-100 bg-white/70 text-sm focus:outline-none focus:border-rose-300"
+              />
+              <button
+                onClick={() => { if (textInput.trim()) { sendMessage(textInput.trim()); setTextInput('') } }}
+                className="px-3 py-2 bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-xl text-sm font-medium whitespace-nowrap"
+              >发送</button>
+            </div>
 
             {/* Hint button */}
             {wsStatus === 'connected' && !isListening && !isWaiting && (

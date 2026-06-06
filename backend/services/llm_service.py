@@ -24,7 +24,10 @@ _HUMAN_STYLE = (
     "Never repeat a question you've already asked. "
     "If their answer is vague, generic, or evasive (e.g. 'it was good', 'because it's healthy'), "
     "don't just accept it — ask ONE pointed follow-up that pushes them to back it up with a concrete "
-    "detail, example, or reason, like a sharp but fair interviewer would."
+    "detail, example, or reason, like a sharp but fair interviewer would. "
+    "If the user mixes in some Chinese because they don't know the English, infer what they mean, "
+    "keep the conversation flowing in English, and naturally show them how to say that part in natural "
+    "English (e.g. 'In English you'd say ...'), then continue."
 )
 
 SCENE_PROMPTS = {

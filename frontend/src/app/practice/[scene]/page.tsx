@@ -74,6 +74,14 @@ function PracticeContent({ scene }: { scene: string }) {
     is_pro: boolean
   } | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [shadowingText, setShadowingText] = useState<string | null>(null)
+  const [shadowingRecording, setShadowingRecording] = useState(false)
+  const [shadowingLoading, setShadowingLoading] = useState(false)
+  const [shadowingResult, setShadowingResult] = useState<{
+    overall: { accuracy: number }
+    words: Array<{ word: string; accuracy: number; error_type: string }>
+  } | null>(null)
+  const shadowingRecorderRef = useRef<MediaRecorder | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -311,6 +319,59 @@ function PracticeContent({ scene }: { scene: string }) {
     }).catch(() => {})
   }
 
+  function openShadowing(text: string) {
+    setShadowingResult(null)
+    setShadowingText(text)
+    setTimeout(() => {
+      window.speechSynthesis.cancel()
+      const u = new SpeechSynthesisUtterance(text)
+      u.lang = 'en-US'; u.rate = 0.9
+      window.speechSynthesis.speak(u)
+    }, 120)
+  }
+
+  function playShadowStandard() {
+    if (!shadowingText) return
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(shadowingText)
+    u.lang = 'en-US'; u.rate = 0.9
+    window.speechSynthesis.speak(u)
+  }
+
+  function handleShadowRecord() {
+    if (shadowingRecording) { shadowingRecorderRef.current?.stop(); return }
+    if (!shadowingText) return
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      const chunks: Blob[] = []
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+      const mr = new MediaRecorder(stream, { mimeType })
+      mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setShadowingRecording(false)
+        const webmBlob = new Blob(chunks, { type: mimeType })
+        if (webmBlob.size < 500) return
+        setShadowingLoading(true)
+        try {
+          const wavBlob = await blobToWav(webmBlob)
+          const token = await getToken()
+          const headers: Record<string, string> = {}
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const fd = new FormData()
+          fd.append('audio', wavBlob, 'shadow.wav')
+          fd.append('reference_text', shadowingText!)
+          const res = await fetch(`${API_URL}/api/shadowing-assess`, { method: 'POST', headers, body: fd })
+          if (res.status === 429) { setShowUpgradeModal(true); return }
+          if (res.ok) { setShadowingResult(await res.json()); fetchUsage() }
+        } catch {}
+        finally { setShadowingLoading(false) }
+      }
+      mr.start(100)
+      shadowingRecorderRef.current = mr
+      setShadowingRecording(true)
+    }).catch(() => {})
+  }
+
   const handleEndPractice = async () => {
     if (isEnding) return
     setIsEnding(true)
@@ -392,11 +453,17 @@ function PracticeContent({ scene }: { scene: string }) {
                     <div className="w-7 h-7 rounded-full bg-gradient-to-r from-rose-400 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">AI</div>
                   )}
                   {msg.role === 'ai' ? (
-                    <WordTooltip className="inline">
-                      <div className="max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-white/90 border border-pink-100 text-gray-700 rounded-bl-sm shadow-[0_2px_8px_rgba(244,114,182,0.08)]">
-                        {msg.text}
-                      </div>
-                    </WordTooltip>
+                    <div className="flex flex-col items-start gap-1">
+                      <WordTooltip className="inline">
+                        <div className="max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-white/90 border border-pink-100 text-gray-700 rounded-bl-sm shadow-[0_2px_8px_rgba(244,114,182,0.08)]">
+                          {msg.text}
+                        </div>
+                      </WordTooltip>
+                      <button
+                        onClick={() => openShadowing(msg.text)}
+                        className="text-xs text-rose-400 hover:text-rose-600 ml-1 flex items-center gap-0.5"
+                      >🎯 跟读这句</button>
+                    </div>
                   ) : (
                     <div className="max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-br-sm shadow-[0_2px_12px_rgba(244,63,94,0.2)]">
                       {msg.text}
@@ -598,6 +665,52 @@ function PracticeContent({ scene }: { scene: string }) {
           </div>
         </div>
       </div>
+
+      {/* Shadowing modal */}
+      {shadowingText && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4"
+          onClick={() => { window.speechSynthesis.cancel(); setShadowingText(null) }}
+        >
+          <div
+            className="bg-white/95 backdrop-blur-xl rounded-2xl p-6 max-w-md w-full shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-gray-800 text-base">🎯 影子跟读</h3>
+              <button onClick={() => { window.speechSynthesis.cancel(); setShadowingText(null) }} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-2">听标准发音 → 跟读 → 看你的得分</p>
+            <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3 mb-3 text-sm leading-relaxed">
+              {shadowingResult ? (
+                shadowingResult.words.map((w, i) => (
+                  <span key={i} className={w.accuracy >= 80 ? 'text-green-600' : w.accuracy >= 60 ? 'text-yellow-600' : 'text-rose-500 font-semibold'}>{w.word} </span>
+                ))
+              ) : (
+                <span className="text-gray-700">{shadowingText}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mb-3">
+              <button onClick={playShadowStandard} className="flex-1 py-2 rounded-xl border border-rose-200 text-rose-500 text-sm font-medium hover:bg-rose-50">🔊 听标准</button>
+              <button onClick={handleShadowRecord} className={`flex-1 py-2 rounded-xl text-sm font-medium text-white ${shadowingRecording ? 'bg-rose-500 animate-pulse' : 'bg-gradient-to-r from-rose-400 to-pink-500'}`}>
+                {shadowingRecording ? '⏹ 停止' : '🎤 跟读'}
+              </button>
+            </div>
+            {shadowingLoading && <p className="text-xs text-gray-400 text-center">评分中...</p>}
+            {shadowingResult && !shadowingLoading && (
+              <div className="text-center">
+                <p className={`text-4xl font-bold ${shadowingResult.overall.accuracy >= 80 ? 'text-green-500' : shadowingResult.overall.accuracy >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                  {shadowingResult.overall.accuracy}
+                </p>
+                <p className="text-xs text-gray-400 mb-2">
+                  跟读准确度 · {shadowingResult.overall.accuracy >= 90 ? '太棒了！' : shadowingResult.overall.accuracy >= 75 ? '很不错' : shadowingResult.overall.accuracy >= 60 ? '继续加油' : '再试一次'}
+                </p>
+                <button onClick={handleShadowRecord} className="text-xs text-rose-400 hover:text-rose-600 underline">🔁 再读一次</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Upgrade modal */}
       {showUpgradeModal && (

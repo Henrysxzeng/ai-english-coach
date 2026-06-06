@@ -2,7 +2,7 @@ from datetime import date as _date
 from fastapi import APIRouter, Form, Request, UploadFile, File, HTTPException
 import aiosqlite
 from models.db import DB_PATH
-from services.pronunciation_service import assess_pronunciation, transcribe_only
+from services.pronunciation_service import assess_pronunciation, transcribe_only, assess_shadowing
 from utils.auth import get_clerk_user_id, get_admin_user_ids, get_pro_user_ids
 import os
 
@@ -39,6 +39,29 @@ async def _is_db_pro(clerk_user_id: str) -> bool:
             (clerk_user_id,),
         )
         return (await row.fetchone()) is not None
+
+
+async def _enforce_and_count_quota(request: Request) -> None:
+    """检查每日额度并计数；超限抛 429。供发音评测/影子跟读共用。"""
+    today = str(_date.today())
+    auth_header = request.headers.get("Authorization")
+    clerk_uid = await get_clerk_user_id(auth_header)
+    user_id = clerk_uid if clerk_uid else "ip:" + (request.client.host if request.client else "unknown")
+
+    if clerk_uid and clerk_uid in get_admin_user_ids():
+        return  # 管理员不限速
+
+    is_pro = False
+    if clerk_uid:
+        is_pro = (clerk_uid in get_pro_user_ids()) or (await _is_db_pro(clerk_uid))
+    limit = 999999 if is_pro else (FREE_DAILY_LIMIT if clerk_uid else ANON_DAILY_LIMIT)
+    usage = await _get_usage(user_id, today)
+    if usage >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail={"error": "daily_limit_reached", "limit": limit, "used": usage, "is_pro": is_pro},
+        )
+    await _increment_usage(user_id, today)
 
 
 @router.post("/api/pronunciation-assess")
@@ -112,6 +135,19 @@ async def transcribe(audio: UploadFile = File(...)):
     content_type = audio.content_type or "audio/webm;codecs=opus"
     text = await transcribe_only(audio_bytes, content_type)
     return {"transcript": text}
+
+
+@router.post("/api/shadowing-assess")
+async def shadowing_assess(
+    request: Request,
+    audio: UploadFile = File(...),
+    reference_text: str = Form(...),
+):
+    """影子跟读评分：按给定目标句评估用户的跟读发音。"""
+    await _enforce_and_count_quota(request)
+    audio_bytes = await audio.read()
+    content_type = audio.content_type or "audio/webm;codecs=opus"
+    return await assess_shadowing(audio_bytes, content_type, reference_text)
 
 
 @router.get("/api/user/status")

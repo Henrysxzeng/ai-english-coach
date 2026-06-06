@@ -14,6 +14,7 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
 interface ChatMessage {
   role: 'user' | 'ai'
   text: string
+  audioUrl?: string
 }
 
 interface Correction {
@@ -88,6 +89,7 @@ function PracticeContent({ scene }: { scene: string }) {
   const recognitionRef = useRef<any>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const recordingStartRef = useRef<number>(0)
+  const recordingAudioRef = useRef<string | null>(null)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -128,9 +130,11 @@ function PracticeContent({ scene }: { scene: string }) {
         const data: any = JSON.parse(event.data)
         if (data.type === 'stream_start') {
           setIsWaiting(false)
+          const audioUrl = recordingAudioRef.current
+          recordingAudioRef.current = null
           setMessages((prev) => {
             const next = [...prev]
-            if (data.user_text) next.push({ role: 'user', text: data.user_text })
+            if (data.user_text) next.push({ role: 'user', text: data.user_text, audioUrl: audioUrl || undefined })
             next.push({ role: 'ai', text: '' })
             return next
           })
@@ -214,6 +218,7 @@ function PracticeContent({ scene }: { scene: string }) {
         setIsListening(false)
         const webmBlob = new Blob(chunks, { type: mimeType })
         if (webmBlob.size < 500) { setStatusText('Too short — try again'); return }
+        recordingAudioRef.current = URL.createObjectURL(webmBlob)
         setStatusText('Analyzing speech...')
         setPronLoading(true)
         try {
@@ -478,14 +483,28 @@ function PracticeContent({ scene }: { scene: string }) {
                           {msg.text}
                         </div>
                       </WordTooltip>
-                      <button
-                        onClick={() => openShadowing(msg.text)}
-                        className="text-xs text-rose-400 hover:text-rose-600 ml-1 flex items-center gap-0.5"
-                      >🎯 跟读这句</button>
+                      <div className="flex items-center gap-2 ml-1">
+                        <button
+                          onClick={() => openShadowing(msg.text)}
+                          className="text-xs text-rose-400 hover:text-rose-600 flex items-center gap-0.5"
+                        >🎯 跟读这句</button>
+                        <button
+                          onClick={() => { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg.text); u.lang = 'en-US'; u.rate = 0.9; window.speechSynthesis.speak(u) }}
+                          className="text-xs text-gray-400 hover:text-rose-500"
+                        >🔊 重听</button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-br-sm shadow-[0_2px_12px_rgba(244,63,94,0.2)]">
-                      {msg.text}
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="max-w-xs lg:max-w-sm px-4 py-2.5 rounded-2xl text-sm leading-relaxed bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-br-sm shadow-[0_2px_12px_rgba(244,63,94,0.2)]">
+                        {msg.text}
+                      </div>
+                      {msg.audioUrl && (
+                        <button
+                          onClick={() => { const a = new Audio(msg.audioUrl); a.play() }}
+                          className="text-xs text-rose-400 hover:text-rose-600 mr-1"
+                        >🔊 回放我的录音</button>
+                      )}
                     </div>
                   )}
                   {msg.role === 'user' && (

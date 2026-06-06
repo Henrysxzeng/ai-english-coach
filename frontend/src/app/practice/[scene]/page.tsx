@@ -517,11 +517,23 @@ function PracticeContent({ scene }: { scene: string }) {
                     <p className="text-xs text-gray-400">Accuracy</p>
                   </div>
                   <div className="text-center bg-white/30 rounded-xl p-2">
-                    <p className="text-lg font-bold text-gray-300">—</p>
+                    {pronResult.overall.fluency > 0 ? (
+                      <p className={`text-lg font-bold ${pronResult.overall.fluency >= 80 ? 'text-green-500' : pronResult.overall.fluency >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                        {pronResult.overall.fluency}
+                      </p>
+                    ) : (
+                      <p className="text-lg font-bold text-gray-300">—</p>
+                    )}
                     <p className="text-xs text-gray-400">Fluency</p>
                   </div>
                   <div className="text-center bg-white/30 rounded-xl p-2">
-                    <p className="text-lg font-bold text-gray-300">—</p>
+                    {pronResult.overall.pron_score > 0 ? (
+                      <p className={`text-lg font-bold ${pronResult.overall.pron_score >= 80 ? 'text-green-500' : pronResult.overall.pron_score >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                        {pronResult.overall.pron_score}
+                      </p>
+                    ) : (
+                      <p className="text-lg font-bold text-gray-300">—</p>
+                    )}
                     <p className="text-xs text-gray-400">Overall</p>
                   </div>
                 </div>

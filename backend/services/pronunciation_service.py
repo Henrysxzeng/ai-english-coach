@@ -76,7 +76,11 @@ async def _score_with_reference(
     nbest = data.get("NBest", [{}])[0]
     words_raw = nbest.get("Words", [])
 
-    # Azure REST API returns scores flat on each word, not nested under PronunciationAssessment
+    # Log all nbest keys to verify what Azure actually returns
+    nbest_keys = {k: v for k, v in nbest.items() if k != "Words"}
+    print(f"[PRON] nbest scores: {nbest_keys}")
+
+    # Azure REST API returns scores flat on NBest, not nested under PronunciationAssessment
     words = [
         {
             "word": w.get("Word", ""),
@@ -86,17 +90,20 @@ async def _score_with_reference(
         for w in words_raw
     ]
 
-    # Compute overall from word scores + NBest-level AccuracyScore
     word_scores = [w["accuracy"] for w in words]
     avg_acc = round(sum(word_scores) / len(word_scores), 1) if word_scores else 0
+
     nbest_acc = round(nbest.get("AccuracyScore", avg_acc), 1)
+    nbest_fluency = round(nbest.get("FluencyScore", 0), 1)
+    nbest_completeness = round(nbest.get("CompletenessScore", 100), 1)
+    nbest_pron = round(nbest.get("PronScore", 0), 1)
 
     return {
         "overall": {
             "accuracy": nbest_acc,
-            "fluency": nbest_acc,   # REST API doesn't expose FluencyScore separately
-            "completeness": 100,
-            "pron_score": nbest_acc,
+            "fluency": nbest_fluency,
+            "completeness": nbest_completeness,
+            "pron_score": nbest_pron,
         },
         "words": words,
         "transcript": reference_text,

@@ -174,51 +174,57 @@ function PracticeContent({ scene }: { scene: string }) {
     if (typeof window === 'undefined') return
     const SpeechRecognitionAPI: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognitionAPI) { setStatusText('Speech recognition not supported — please use Chrome'); return }
-    const recognition: any = new SpeechRecognitionAPI()
-    recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
-    recognitionRef.current = recognition
-    let accumulatedText = ''
-    recognition.onstart = () => {
-      accumulatedText = ''
-      recordingStartRef.current = Date.now()
-      setIsListening(true)
-      setStatusText('Listening… (click to stop)')
-      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        audioChunksRef.current = []
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : 'audio/webm'
-        const mr = new MediaRecorder(stream, { mimeType })
-        mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-        mr.start()
-        mediaRecorderRef.current = mr
-      }).catch(() => {})
-    }
-    recognition.onend = () => {
-      setIsListening(false)
-      const text = accumulatedText.trim(); accumulatedText = ''
-      const mr = mediaRecorderRef.current
-      if (mr && mr.state !== 'inactive') {
-        mr.stop()
-        mr.onstop = async () => {
-          mr.stream.getTracks().forEach(t => t.stop())
-          const mimeType = mr.mimeType || 'audio/webm'
-          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
-          if (audioBlob.size >= 1000) await sendPronunciationAssess(audioBlob)
-        }
+
+    // Get mic stream first, then start both MediaRecorder + SpeechRecognition simultaneously
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      audioChunksRef.current = []
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm'
+      const mr = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 16000 })
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mr.start(100) // collect chunks every 100ms
+      mediaRecorderRef.current = mr
+
+      const recognition: any = new SpeechRecognitionAPI()
+      recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = false
+      recognitionRef.current = recognition
+      let accumulatedText = ''
+
+      recognition.onstart = () => {
+        accumulatedText = ''
+        recordingStartRef.current = Date.now()
+        setIsListening(true)
+        setStatusText('Listening… (click to stop)')
       }
-      if (!text) return
-      if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
-      if (recordingMode === 'manual') { setPendingText(text); setStatusText('Review your message, then click Send ✉️'); return }
-      sendMessage(text)
-    }
-    recognition.onerror = (e: any) => { setIsListening(false); accumulatedText = ''; if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`) }
-    recognition.onresult = (e: any) => {
-      let text = ''
-      for (let i = 0; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript }
-      accumulatedText = text
-    }
-    try { recognition.start() } catch { setStatusText('Could not start recognition') }
+      recognition.onend = () => {
+        setIsListening(false)
+        const text = accumulatedText.trim(); accumulatedText = ''
+        if (mr.state !== 'inactive') {
+          mr.stop()
+          mr.onstop = async () => {
+            stream.getTracks().forEach(t => t.stop())
+            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
+            if (audioBlob.size >= 500) await sendPronunciationAssess(audioBlob)
+          }
+        }
+        if (!text) return
+        if (/[一-鿿぀-ヿ가-힯]/.test(text)) { setStatusText('Please speak in English 🇬🇧'); return }
+        if (recordingMode === 'manual') { setPendingText(text); setStatusText('Review your message, then click Send ✉️'); return }
+        sendMessage(text)
+      }
+      recognition.onerror = (e: any) => {
+        setIsListening(false); accumulatedText = ''
+        if (mr.state !== 'inactive') { mr.stop(); stream.getTracks().forEach(t => t.stop()) }
+        if (e.error !== 'no-speech') setStatusText(`Recognition error: ${e.error}`)
+      }
+      recognition.onresult = (e: any) => {
+        let text = ''
+        for (let i = 0; i < e.results.length; i++) { if (e.results[i].isFinal) text += e.results[i][0].transcript }
+        accumulatedText = text
+      }
+      try { recognition.start() } catch { setStatusText('Could not start recognition') }
+    }).catch(() => { setStatusText('Microphone access denied') })
   }, [isListening, recordingMode, sendMessage])
 
   async function fetchUsage() {

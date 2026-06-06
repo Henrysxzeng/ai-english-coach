@@ -321,6 +321,26 @@ export default function ReportPage() {
           </div>
         )}
 
+        {/* 7b. Pronunciation Tips */}
+        {report.pronunciation_tips && report.pronunciation_tips.length > 0 && (
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
+            <h2 className="font-semibold text-gray-800 mb-4">🔊 Pronunciation Tips</h2>
+            <div className="space-y-3">
+              {report.pronunciation_tips.map((tip, i) => (
+                <div key={i} className="flex items-start gap-3 bg-white/60 border border-pink-100 rounded-xl p-3">
+                  <div className="flex-1">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-800 text-sm">{tip.word}</span>
+                      <span className="text-rose-400 font-mono text-xs">{tip.ipa}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{tip.tip}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 8. STAR Interview Feedback (sde_* scenes) */}
         {report.interview_feedback && (
           <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.08)]">

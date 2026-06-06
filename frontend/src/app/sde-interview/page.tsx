@@ -41,6 +41,7 @@ export default function SdeInterviewPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<QuestionCategory | 'all'>('all')
   const [showQuestions, setShowQuestions] = useState(false)
+  const [expandedExample, setExpandedExample] = useState<string | null>(null)
 
   async function handleStart() {
     if (!selectedScene || isLoading) return
@@ -254,6 +255,20 @@ export default function SdeInterviewPage() {
                         }`}>{q.difficulty}</span>
                       </div>
                       <p className="text-xs text-gray-400 mt-1.5 italic">💡 {q.hint}</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedExample(expandedExample === q.id ? null : q.id)
+                        }}
+                        className="text-xs text-rose-400 hover:text-rose-500 mt-1.5 transition-colors"
+                      >
+                        {expandedExample === q.id ? '▲ Hide example' : '▾ Show example answer'}
+                      </button>
+                      {expandedExample === q.id && (
+                        <div className="mt-2 p-3 bg-white/40 border border-white/60 rounded-xl text-xs text-gray-600 leading-relaxed">
+                          {q.starExample}
+                        </div>
+                      )}
                     </div>
                   ))
                 }

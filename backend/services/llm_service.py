@@ -184,6 +184,43 @@ async def evaluate_correction(user_text: str) -> dict:
         return EMPTY_CORRECTION.copy()
 
 
+async def evaluate_upgrade(user_text: str) -> dict:
+    """对语法正确但生硬/中式的表达，给出更地道的母语说法（不止纠错）。"""
+    prompt = (
+        f'A learner said: "{user_text}"\n\n'
+        "If this is grammatically acceptable but sounds unnatural, stiff, or like a direct translation "
+        "from Chinese, suggest how a native American speaker would more naturally say it in everyday conversation.\n"
+        "IMPORTANT: focus on NATURALNESS / idiomatic phrasing, NOT fancy or advanced vocabulary. "
+        "If it already sounds natural and native, set has_suggestion to false.\n"
+        "Be conservative — only suggest when it genuinely sounds non-native.\n\n"
+        "Reply ONLY with JSON:\n"
+        '{"has_suggestion": bool, "better": str, "reason": str}\n'
+        "- better: the more natural native version (empty string if none)\n"
+        "- reason: one short sentence in Chinese explaining why it's more natural (empty string if none)\n"
+        "Output only the JSON, nothing else."
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150,
+            temperature=0.3,
+        )
+        text = response.choices[0].message.content.strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
+        return {
+            "has_suggestion": bool(result.get("has_suggestion", False)),
+            "better": str(result.get("better", "")),
+            "reason": str(result.get("reason", "")),
+        }
+    except Exception:
+        return {"has_suggestion": False, "better": "", "reason": ""}
+
+
 async def _get_real_pronunciation(session_id: str):
     """读取本次会话练习中 Azure 真实发音评测的平均准确度；无记录返回 None。"""
     try:

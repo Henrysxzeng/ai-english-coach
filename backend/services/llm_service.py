@@ -244,6 +244,7 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
         '"ambiguous_expressions": [{"original": str, "better": str, "explanation": str}], '
         '"weak_areas": [str], '
         '"key_vocabulary": [{"word": str, "definition": str, "example": str}], '
+        '"pronunciation_tips": [{"word": str, "ipa": str, "tip": str}], '
         '"suggestions": [str, str, str], "highlights": [str, str]}\n\n'
         "Requirements:\n"
         "- topic: 1 sentence describing what the conversation was about\n"
@@ -252,6 +253,11 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
         "- ambiguous_expressions: max 3, only expressions that would genuinely confuse a native speaker\n"
         "- weak_areas: max 3, only from: grammar, clarity, structure, vocabulary, response_completeness\n"
         "- key_vocabulary: 3-5 useful words or phrases for this scene. Include words the user used well AND important vocabulary they missed. Keep definitions under 10 words. Use a real example sentence.\n"
+        "- pronunciation_tips: identify 2-3 words from the user's speech that Chinese speakers commonly mispronounce. "
+        "For each word include: 'word' (the exact word), 'ipa' (IPA phonetic like /prəˌnʌnsiˈeɪʃən/), "
+        "'tip' (1 sentence: what Chinese speakers typically get wrong and what to focus on). "
+        "Return empty array [] if user spoke fewer than 15 words or all words are simple monosyllables. "
+        "Examples of common issues: th→d/f, l/r confusion, word-final consonant dropping, stress on wrong syllable.\n"
         "- suggestions: 3 specific tips referencing actual phrases from the user's sentences\n"
         "- highlights: 2 genuine strengths from actual sentences; if none, note their effort\n"
         "Output only the JSON, nothing else."
@@ -262,7 +268,7 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
         response = await client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=800,
+            max_tokens=950,
             temperature=0.3,
         )
         text = response.choices[0].message.content.strip()
@@ -287,6 +293,8 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
         result.setdefault("weak_areas", [])
         result.setdefault("key_vocabulary", [])
         result["key_vocabulary"] = result["key_vocabulary"][:5]
+        result.setdefault("pronunciation_tips", [])
+        result["pronunciation_tips"] = result["pronunciation_tips"][:3]
     except Exception:
         result = {
             "pronunciation_score": pronunciation_score,
@@ -300,6 +308,7 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
             "ambiguous_expressions": [],
             "weak_areas": ["grammar"] if grammar_errors > 2 else [],
             "key_vocabulary": [],
+            "pronunciation_tips": [],
             "suggestions": [
                 "Practice using more varied sentence structures.",
                 "Expand your vocabulary with topic-specific words.",

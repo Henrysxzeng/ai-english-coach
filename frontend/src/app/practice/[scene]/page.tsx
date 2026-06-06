@@ -245,7 +245,12 @@ function PracticeContent({ scene }: { scene: string }) {
         body: formData,
       })
       if (res.status === 429) { setShowUpgradeModal(true); return }
-      if (res.ok) { setPronResult(await res.json()); fetchUsage() }
+      if (res.ok) {
+        const data = await res.json()
+        if (data.error) console.error('[Pronunciation] Azure error:', data.error)
+        setPronResult(data)
+        fetchUsage()
+      }
     } catch {}
     finally { setPronLoading(false) }
   }

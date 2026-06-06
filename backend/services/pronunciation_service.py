@@ -44,10 +44,10 @@ async def assess_pronunciation(
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(url, content=audio_bytes, headers=headers)
             if resp.status_code != 200:
-                return _fallback()
+                return _fallback(f"azure_{resp.status_code}: {resp.text[:200]}")
             data = resp.json()
-    except Exception:
-        return _fallback()
+    except Exception as e:
+        return _fallback(str(e)[:200])
 
     # 解析结果
     nbest = data.get("NBest", [{}])[0]
@@ -75,9 +75,10 @@ async def assess_pronunciation(
     }
 
 
-def _fallback() -> dict:
+def _fallback(error: str = "") -> dict:
     return {
         "overall": {"accuracy": 0, "fluency": 0, "completeness": 0, "pron_score": 0},
         "words": [],
         "transcript": "",
+        "error": error,
     }

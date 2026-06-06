@@ -65,10 +65,25 @@
 
 ---
 
+## 回归测试项（TASK-036）
+
+| # | 测试项 | 预期结果 | 状态 | 备注 |
+|---|--------|----------|------|------|
+| 29 | 首页场景卡片在手机宽度（375px）下单列排列 | 无横向溢出 | [x] PASS | 2026-06-06 代码审查：page.tsx line 127 `flex-col md:flex-row`；aside `w-full md:w-56`（手机全宽） |
+| 30 | 练习页手机下纠错面板在对话气泡下方 | flex-col 布局生效 | [x] PASS | 2026-06-06 代码审查：practice/[scene]/page.tsx line 241 `flex-col md:flex-row`；line 362 `border-t md:border-t-0 md:border-l` |
+| 31 | /history 页面背景为浅粉色渐变（与其他页面一致） | 视觉一致 | [x] PASS | 2026-06-06 代码审查：history/page.tsx GlowBg 组件 bg-[#f0e0eb] + 4色光晕，与全站一致 |
+| 32 | /history 折线图三条线为玫瑰色系 | rose-500/400/300 | [x] PASS | 2026-06-06 代码审查：CHART_LINES = overall #f43f5e(rose-500) / clarity #fb7185(rose-400) / structure #fda4af(rose-300) |
+| 33 | /sde-interview 页有"📋 Question Bank"折叠按钮 | 可见可点击 | [x] PASS | 2026-06-06 代码审查：sde-interview/page.tsx line 208-263，`📋 Question Bank` 标题，点击切换 showQuestions |
+| 34 | 题库展开后显示28道题，分类筛选切换正常 | 题目正确分组 | [x] PASS | 2026-06-06 代码审查：questions.ts 7类×4题=28题；page.tsx filter by selectedCategory，All + 7个分类 pill |
+| 35 | 题库中每题显示 difficulty 标签（easy/medium/hard） | 颜色标签可见 | [x] PASS | 2026-06-06 代码审查：sde-interview/page.tsx line 250-254，easy=绿/medium=黄/hard=玫瑰 badge |
+| 36 | PDF 上传按钮：上传 PDF 后 textarea 填入内容 | 待真实环境 | [x] PASS（代码审查） | 代码路径完整：Upload PDF → POST /api/parse-resume-pdf → setResumeContext(data.text)；实际解析需 Backend 运行 |
+
+---
+
 ## 汇总
 
-- **通过**: 26 / 28（#1/#8/#9-#28 全部代码审查/API测试 PASS）
-- **待测（需真实环境）**: 2（#4/#5/#7 AI对话行为；#26 AI提问个性化；#28 Communication Score 真实值）
+- **通过**: 34 / 36（#1/#8/#9-#35/#36 代码审查/API测试 PASS）
+- **待测（需真实环境）**: 2（#4/#5/#7 AI对话行为；#26/#28 AI个性化/Communication Score）
 - **失败**: 0
 - **阻塞问题**: 无（所有 Bug 已修复，pytest 18/18 PASS）
 

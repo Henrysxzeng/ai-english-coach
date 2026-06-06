@@ -509,32 +509,15 @@ function PracticeContent({ scene }: { scene: string }) {
             ) : pronResult ? (
               <div>
                 <button onClick={() => setPronResult(null)} className="text-xs text-gray-400 hover:text-rose-400 mb-2 block">↩ Record again</button>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className="text-center bg-white/30 rounded-xl p-2">
-                    <p className={`text-lg font-bold ${pronResult.overall.accuracy >= 80 ? 'text-green-500' : pronResult.overall.accuracy >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
-                      {pronResult.overall.accuracy}
+                <div className="flex items-center gap-3 mb-3 bg-white/30 rounded-xl p-3">
+                  <p className={`text-3xl font-bold ${pronResult.overall.accuracy >= 80 ? 'text-green-500' : pronResult.overall.accuracy >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
+                    {pronResult.overall.accuracy}
+                  </p>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Accuracy</p>
+                    <p className="text-xs text-gray-400">
+                      {pronResult.overall.accuracy >= 90 ? 'Excellent' : pronResult.overall.accuracy >= 75 ? 'Good' : pronResult.overall.accuracy >= 60 ? 'Needs work' : 'Keep practicing'}
                     </p>
-                    <p className="text-xs text-gray-400">Accuracy</p>
-                  </div>
-                  <div className="text-center bg-white/30 rounded-xl p-2">
-                    {pronResult.overall.fluency > 0 ? (
-                      <p className={`text-lg font-bold ${pronResult.overall.fluency >= 80 ? 'text-green-500' : pronResult.overall.fluency >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
-                        {pronResult.overall.fluency}
-                      </p>
-                    ) : (
-                      <p className="text-lg font-bold text-gray-300">—</p>
-                    )}
-                    <p className="text-xs text-gray-400">Fluency</p>
-                  </div>
-                  <div className="text-center bg-white/30 rounded-xl p-2">
-                    {pronResult.overall.pron_score > 0 ? (
-                      <p className={`text-lg font-bold ${pronResult.overall.pron_score >= 80 ? 'text-green-500' : pronResult.overall.pron_score >= 60 ? 'text-yellow-500' : 'text-rose-500'}`}>
-                        {pronResult.overall.pron_score}
-                      </p>
-                    ) : (
-                      <p className="text-lg font-bold text-gray-300">—</p>
-                    )}
-                    <p className="text-xs text-gray-400">Overall</p>
                   </div>
                 </div>
                 {pronResult.words.filter(w => w.error_type !== 'None' || w.accuracy < 70).length > 0 && (

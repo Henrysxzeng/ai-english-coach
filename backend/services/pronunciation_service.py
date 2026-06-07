@@ -84,7 +84,7 @@ async def _score_with_reference(
     pa_config = {
         "ReferenceText": reference_text,
         "GradingSystem": "HundredMark",
-        "Granularity": "Word",
+        "Granularity": "Phoneme",
         "EnableMiscue": True,
     }
     pa_header = base64.b64encode(json.dumps(pa_config).encode()).decode()
@@ -107,11 +107,22 @@ async def _score_with_reference(
     nbest = data.get("NBest", [{}])[0]
     words_raw = nbest.get("Words", [])
 
+    def _weak_phonemes(w):
+        out = []
+        for p in w.get("Phonemes", []):
+            acc = p.get("AccuracyScore")
+            if acc is None:
+                acc = p.get("PronunciationAssessment", {}).get("AccuracyScore", 100)
+            if acc < 60:
+                out.append({"phoneme": p.get("Phoneme", ""), "accuracy": round(acc, 1)})
+        return out[:4]
+
     words = [
         {
             "word": w.get("Word", ""),
             "accuracy": round(w.get("AccuracyScore", 0), 1),
             "error_type": "None" if w.get("AccuracyScore", 100) >= 60 else "Mispronunciation",
+            "weak_phonemes": _weak_phonemes(w),
         }
         for w in words_raw
     ]

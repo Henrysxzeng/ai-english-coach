@@ -19,11 +19,13 @@ async def assess_pronunciation(
     audio_bytes: bytes,
     content_type: str = "audio/wav",
     duration_ms: int = 0,
+    known_transcript: str = "",
 ) -> dict:
     if not AZURE_KEY:
         return _fallback("no_azure_key")
 
-    transcript = await _get_transcript(audio_bytes, content_type)
+    # 复用对话已转写好的文本，省掉一次 Azure STT 调用（降本约 1/3）
+    transcript = known_transcript.strip() or await _get_transcript(audio_bytes, content_type)
     if not transcript:
         return _fallback("no_transcript_detected")
 

@@ -240,6 +240,7 @@ function PracticeContent({ scene }: { scene: string }) {
           pForm.append('audio', wavBlob, 'recording.wav')
           pForm.append('duration_ms', String(durationMs))
           pForm.append('session_id', sessionId)
+          pForm.append('reference_text', transcript)
           fetch(`${API_URL}/api/pronunciation-assess`, { method: 'POST', headers, body: pForm })
             .then(async pRes => {
               if (pRes.status === 429) { setShowUpgradeModal(true); return }
@@ -837,8 +838,8 @@ function PracticeContent({ scene }: { scene: string }) {
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-8 max-w-sm mx-4 text-center
             shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
             <p className="text-2xl mb-2">🎙️</p>
-            <h3 className="font-bold text-gray-800 text-lg mb-2">每日免费次数用完了</h3>
-            <p className="text-sm text-gray-500 mb-5">升级 Pro 会员，发音评测无限次 · ¥6.9/月</p>
+            <h3 className="font-bold text-gray-800 text-lg mb-2">今日免费次数已用完</h3>
+            <p className="text-sm text-gray-500 mb-5">升级 Pro：无限模拟面试 · 音素级评测 · 弱点记忆闭环 · ¥39/月</p>
             <a
               href={process.env.NEXT_PUBLIC_AFDIAN_URL ?? 'https://ifdian.net/a/aienglishcoach'}
               target="_blank"

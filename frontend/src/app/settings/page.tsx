@@ -94,7 +94,7 @@ export default function SettingsPage() {
               rel="noopener noreferrer"
               className="text-sm text-rose-500 hover:text-rose-600 font-medium"
             >
-              去爱发电订阅 Pro → ¥6.9/月
+              去爱发电订阅 Pro → ¥39/月
             </a>
           </div>
         </div>

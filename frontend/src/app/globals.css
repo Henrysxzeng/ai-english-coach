@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── 主题：默认玫瑰粉（rose/pink 原始色值，RGB 空格分隔供 <alpha-value> 使用）── */
+:root {
+  --rose-50: 255 241 242;
+  --rose-100: 255 228 230;
+  --rose-200: 254 205 211;
+  --rose-300: 253 164 175;
+  --rose-400: 251 113 133;
+  --rose-500: 244 63 94;
+  --rose-600: 225 29 72;
+  --rose-700: 190 18 60;
+  --rose-800: 159 18 57;
+  --rose-900: 136 19 55;
+  --pink-50: 253 242 248;
+  --pink-100: 252 231 243;
+  --pink-200: 251 207 232;
+  --pink-300: 249 168 212;
+  --pink-400: 244 114 182;
+  --pink-500: 236 72 153;
+  --pink-600: 219 39 119;
+  --app-bg: #fdf8fb;
+}
+
+/* ── 蓝色主题：rose→blue，pink→sky ── */
+[data-theme='blue'] {
+  --rose-50: 239 246 255;
+  --rose-100: 219 234 254;
+  --rose-200: 191 219 254;
+  --rose-300: 147 197 253;
+  --rose-400: 96 165 250;
+  --rose-500: 59 130 246;
+  --rose-600: 37 99 235;
+  --rose-700: 29 78 216;
+  --rose-800: 30 64 175;
+  --rose-900: 30 58 138;
+  --pink-50: 240 249 255;
+  --pink-100: 224 242 254;
+  --pink-200: 186 230 253;
+  --pink-300: 125 211 252;
+  --pink-400: 56 189 248;
+  --pink-500: 14 165 233;
+  --pink-600: 2 132 199;
+  --app-bg: #eff6ff;
+}
+
+body {
+  background-color: var(--app-bg);
+  transition: background-color 0.3s ease;
+}

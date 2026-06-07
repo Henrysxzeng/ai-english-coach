@@ -4,6 +4,7 @@
 import type { Metadata } from 'next'
 import { ClerkProvider } from '@clerk/nextjs'
 import './globals.css'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export const metadata: Metadata = {
   title: 'AI English Coach',
@@ -13,9 +14,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="antialiased bg-[#fdf8fb]">
+      <head>
+        {/* 加载前应用已保存主题，避免闪烁 */}
+        <script dangerouslySetInnerHTML={{ __html: "try{var t=localStorage.getItem('theme');if(t&&t!=='rose')document.documentElement.dataset.theme=t;}catch(e){}" }} />
+      </head>
+      <body className="antialiased">
         <ClerkProvider>
           {children}
+          <ThemeToggle />
         </ClerkProvider>
       </body>
     </html>

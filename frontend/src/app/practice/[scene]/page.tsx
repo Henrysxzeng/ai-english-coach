@@ -93,6 +93,7 @@ function PracticeContent({ scene }: { scene: string }) {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const recordingStartRef = useRef<number>(0)
   const recordingAudioRef = useRef<string | null>(null)
+  const audioElRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -161,20 +162,8 @@ function PracticeContent({ scene }: { scene: string }) {
           })
           if (data.correction) setCorrection(data.correction)
           if (data.upgrade) setUpgrade(data.upgrade)
-          if (data.ai_text && typeof window !== 'undefined' && window.speechSynthesis) {
-            window.speechSynthesis.cancel()
-            const utt = new SpeechSynthesisUtterance(data.ai_text)
-            utt.lang = 'en-US'; utt.rate = 0.9; utt.pitch = 1.0
-            const voices = window.speechSynthesis.getVoices()
-            const preferred = voices.find(v => v.name === 'Google US English')
-              || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('google'))
-              || voices.find(v => v.lang === 'en-US' && !v.name.toLowerCase().includes('zira'))
-              || voices.find(v => v.lang === 'en-US')
-            if (preferred) utt.voice = preferred
-            utt.onend = () => { setIsSpeaking(false); setStatusText('Click mic to speak') }
-            utt.onerror = () => { setIsSpeaking(false); setStatusText('Click mic to speak') }
-            setIsSpeaking(true); setStatusText('AI is speaking...')
-            window.speechSynthesis.speak(utt)
+          if (data.ai_text) {
+            speakAI(data.ai_text)
           } else {
             setStatusText('Click mic to speak')
           }
@@ -286,6 +275,39 @@ function PracticeContent({ scene }: { scene: string }) {
       const res = await fetch(`${API_URL}/api/vocab`, { headers })
       if (res.ok) { const rows = await res.json(); setVocabWords(rows.map((r: { word: string }) => r.word)) }
     } catch {}
+  }
+
+  async function speakAI(text: string) {
+    if (audioElRef.current) { audioElRef.current.pause(); audioElRef.current = null }
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
+    setIsSpeaking(true); setStatusText('AI is speaking...')
+    try {
+      const res = await fetch(`${API_URL}/api/tts?text=${encodeURIComponent(text)}`)
+      if (res.ok) {
+        const audio = new Audio(URL.createObjectURL(await res.blob()))
+        audioElRef.current = audio
+        audio.onended = () => { setIsSpeaking(false); setStatusText('Click mic to speak') }
+        audio.onerror = () => browserSpeak(text)
+        await audio.play()
+        return
+      }
+    } catch { /* fall through */ }
+    browserSpeak(text)
+  }
+
+  function browserSpeak(text: string) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) { setIsSpeaking(false); setStatusText('Click mic to speak'); return }
+    window.speechSynthesis.cancel()
+    const utt = new SpeechSynthesisUtterance(text)
+    utt.lang = 'en-US'; utt.rate = 0.9; utt.pitch = 1.0
+    const voices = window.speechSynthesis.getVoices()
+    const preferred = voices.find(v => v.name === 'Google US English')
+      || voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('google'))
+      || voices.find(v => v.lang === 'en-US')
+    if (preferred) utt.voice = preferred
+    utt.onend = () => { setIsSpeaking(false); setStatusText('Click mic to speak') }
+    utt.onerror = () => { setIsSpeaking(false); setStatusText('Click mic to speak') }
+    window.speechSynthesis.speak(utt)
   }
 
   const [isPronRecording, setIsPronRecording] = useState(false)

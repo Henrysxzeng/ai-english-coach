@@ -8,7 +8,7 @@ import os
 
 router = APIRouter()
 
-FREE_DAILY_LIMIT = int(os.environ.get("FREE_DAILY_LIMIT", "10"))
+FREE_DAILY_LIMIT = int(os.environ.get("FREE_DAILY_LIMIT", "5"))
 ANON_DAILY_LIMIT = 3
 
 
@@ -70,6 +70,7 @@ async def pronunciation_assess(
     audio: UploadFile = File(...),
     duration_ms: int = Form(0),
     session_id: str = Form(""),
+    reference_text: str = Form(""),
 ):
     today = str(_date.today())
     auth_header = request.headers.get("Authorization")
@@ -103,7 +104,7 @@ async def pronunciation_assess(
 
     audio_bytes = await audio.read()
     content_type = audio.content_type or "audio/webm;codecs=opus"
-    result = await assess_pronunciation(audio_bytes, content_type, duration_ms)
+    result = await assess_pronunciation(audio_bytes, content_type, duration_ms, known_transcript=reference_text)
 
     # 落库真实发音分，供课后报告聚合（替代文本估算）
     overall = result.get("overall", {})

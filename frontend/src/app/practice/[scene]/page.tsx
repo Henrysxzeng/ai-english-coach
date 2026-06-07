@@ -68,7 +68,7 @@ function PracticeContent({ scene }: { scene: string }) {
   const audioChunksRef = useRef<Blob[]>([])
   const [pronResult, setPronResult] = useState<{
     overall: { accuracy: number; fluency: number; expression: number }
-    words: Array<{ word: string; accuracy: number; error_type: string }>
+    words: Array<{ word: string; accuracy: number; error_type: string; weak_phonemes?: Array<{ phoneme: string; accuracy: number }> }>
     expression_comment?: string
   } | null>(null)
   const [pronLoading, setPronLoading] = useState(false)
@@ -724,6 +724,9 @@ function PracticeContent({ scene }: { scene: string }) {
                             className="text-xs bg-rose-50 border border-rose-200 text-rose-600 rounded-lg px-2 py-0.5 hover:bg-rose-100 flex items-center gap-0.5"
                           >
                             🔊 {w.word} <span className="text-rose-400">({w.accuracy})</span>
+                            {w.weak_phonemes && w.weak_phonemes.length > 0 && (
+                              <span className="text-purple-500 ml-1">· 难点 {w.weak_phonemes.map(p => p.phoneme).join(' ')}</span>
+                            )}
                           </button>
                         ))}
                     </div>

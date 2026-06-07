@@ -32,3 +32,6 @@ next-env.d.ts
 
 # Reference material (large/copyrighted, not for public repo)
 reference/
+
+# 商业机密（勿进公开仓库，防泄露给竞争对手）
+docs/商业化与增长方案.md

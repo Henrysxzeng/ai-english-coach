@@ -25,7 +25,8 @@ async def init_db():
                 difficulty TEXT DEFAULT 'medium',
                 cefr_level TEXT DEFAULT NULL,
                 resume_context TEXT DEFAULT '',
-                jd_context TEXT DEFAULT ''
+                jd_context TEXT DEFAULT '',
+                problem_context TEXT DEFAULT ''
             )
         """)
         await db.execute("""
@@ -109,6 +110,49 @@ async def init_db():
                 afdian_user_id  TEXT PRIMARY KEY,
                 paid_at         TEXT NOT NULL,
                 linked          INTEGER DEFAULT 0
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_profiles (
+                clerk_user_id   TEXT PRIMARY KEY,
+                resume_text     TEXT DEFAULT '',
+                jd_text         TEXT DEFAULT '',
+                track_focus     TEXT DEFAULT 'sde',
+                updated_at      TEXT NOT NULL
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS module_progress (
+                id              SERIAL PRIMARY KEY,
+                clerk_user_id   TEXT NOT NULL,
+                track           TEXT NOT NULL,
+                module          TEXT NOT NULL,
+                stage           TEXT NOT NULL,
+                status          TEXT NOT NULL DEFAULT 'locked',
+                completed_at    TEXT,
+                UNIQUE (clerk_user_id, track, module, stage)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS study_materials (
+                id              SERIAL PRIMARY KEY,
+                clerk_user_id   TEXT NOT NULL,
+                track           TEXT NOT NULL,
+                module          TEXT NOT NULL,
+                content         TEXT NOT NULL,
+                created_at      TEXT NOT NULL,
+                UNIQUE (clerk_user_id, track, module)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_problems (
+                id              SERIAL PRIMARY KEY,
+                clerk_user_id   TEXT NOT NULL,
+                track           TEXT NOT NULL,
+                module          TEXT NOT NULL,
+                title           TEXT NOT NULL,
+                description     TEXT DEFAULT '',
+                created_at      TEXT NOT NULL
             )
         """)
         await db.commit()

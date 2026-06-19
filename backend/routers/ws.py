@@ -21,7 +21,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        cursor = await db.execute("SELECT scene, status, difficulty, resume_context, jd_context FROM sessions WHERE id = ?", (session_id,))
+        cursor = await db.execute("SELECT scene, status, difficulty, resume_context, jd_context, problem_context FROM sessions WHERE id = ?", (session_id,))
         session = await cursor.fetchone()
 
     if not session:
@@ -38,6 +38,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     difficulty = session["difficulty"] or "medium"
     resume_context = session["resume_context"] or ""
     jd_context = session["jd_context"] or ""
+    problem_context = session["problem_context"] or ""
     turn_id = 1
 
     # Query previous analysis for memory-aware greeting
@@ -124,7 +125,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             ai_text = ""
             try:
                 async for delta in get_ai_response_stream(
-                    scene, messages, difficulty, resume_context=resume_context, jd_context=jd_context, personality=personality, vocab_hints=vocab_hints
+                    scene, messages, difficulty, resume_context=resume_context, jd_context=jd_context, personality=personality, vocab_hints=vocab_hints, problem_context=problem_context
                 ):
                     ai_text += delta
                     await websocket.send_json({"type": "stream_chunk", "delta": delta})

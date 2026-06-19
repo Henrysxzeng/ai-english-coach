@@ -1,7 +1,7 @@
 # routers/vocab.py | backend
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request
-import aiosqlite
+import models.pg as aiosqlite
 from models.db import DB_PATH
 from utils.auth import get_clerk_user_id
 

@@ -2,7 +2,7 @@
 import json
 import os
 from fastapi import APIRouter, HTTPException
-import aiosqlite
+import models.pg as aiosqlite
 from dotenv import load_dotenv
 
 load_dotenv()

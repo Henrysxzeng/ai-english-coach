@@ -1,7 +1,6 @@
-﻿# models/db.py | backend | v1.0
-import aiosqlite
+# models/db.py | backend | v2.0 (Postgres)
 import os
-from pathlib import Path
+import models.pg as aiosqlite
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,8 +9,12 @@ DB_PATH = os.getenv("DATABASE_URL", "./data/coach.db")
 
 
 async def init_db():
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
+        try:
+            # PG 9.2 (this server's version) has no "CREATE SCHEMA IF NOT EXISTS" (added in 9.3)
+            await db.execute(f'CREATE SCHEMA "{aiosqlite.PG_SCHEMA}"')
+        except Exception:
+            pass  # schema already exists (e.g. "public", or a re-used test schema)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
@@ -27,7 +30,7 @@ async def init_db():
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
@@ -40,7 +43,7 @@ async def init_db():
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS corrections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 turn_id INTEGER NOT NULL,
                 original TEXT NOT NULL,
@@ -52,7 +55,7 @@ async def init_db():
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS session_analyses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 session_id TEXT NOT NULL UNIQUE,
                 scene TEXT NOT NULL,
                 topic TEXT,
@@ -67,31 +70,6 @@ async def init_db():
                 FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
         """)
-        try:
-            await db.execute("ALTER TABLE messages ADD COLUMN recording_duration_ms INTEGER DEFAULT 0")
-            await db.commit()
-        except Exception:
-            pass  # 列已存在，忽略
-        try:
-            await db.execute("ALTER TABLE sessions ADD COLUMN difficulty TEXT DEFAULT 'medium'")
-            await db.commit()
-        except Exception:
-            pass
-        try:
-            await db.execute("ALTER TABLE sessions ADD COLUMN cefr_level TEXT DEFAULT NULL")
-            await db.commit()
-        except Exception:
-            pass
-        try:
-            await db.execute("ALTER TABLE sessions ADD COLUMN resume_context TEXT DEFAULT ''")
-            await db.commit()
-        except Exception:
-            pass
-        try:
-            await db.execute("ALTER TABLE sessions ADD COLUMN jd_context TEXT DEFAULT ''")
-            await db.commit()
-        except Exception:
-            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS pronunciation_usage (
                 user_id     TEXT NOT NULL,
@@ -102,7 +80,7 @@ async def init_db():
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS pronunciation_scores (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 session_id  TEXT NOT NULL,
                 accuracy    REAL DEFAULT 0,
                 fluency     REAL DEFAULT 0,
@@ -112,7 +90,7 @@ async def init_db():
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS vocabulary (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          SERIAL PRIMARY KEY,
                 user_id     TEXT NOT NULL,
                 word        TEXT NOT NULL,
                 definition  TEXT DEFAULT '',

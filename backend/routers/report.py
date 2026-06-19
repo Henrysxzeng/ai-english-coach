@@ -4,7 +4,7 @@ import re
 import json
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
-import aiosqlite
+import models.pg as aiosqlite
 from dotenv import load_dotenv
 from services.llm_service import generate_report_scores, generate_interview_feedback
 
@@ -107,11 +107,22 @@ async def get_report(session_id: str):
 
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
-            INSERT OR REPLACE INTO session_analyses
+            INSERT INTO session_analyses
             (session_id, scene, topic, clarity_score, structure_score,
              ambiguous_expressions, weak_areas, overall_score, grammar_errors,
              vocabulary_score, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (session_id) DO UPDATE SET
+                scene = excluded.scene,
+                topic = excluded.topic,
+                clarity_score = excluded.clarity_score,
+                structure_score = excluded.structure_score,
+                ambiguous_expressions = excluded.ambiguous_expressions,
+                weak_areas = excluded.weak_areas,
+                overall_score = excluded.overall_score,
+                grammar_errors = excluded.grammar_errors,
+                vocabulary_score = excluded.vocabulary_score,
+                created_at = excluded.created_at
         """, (
             session_id,
             session["scene"],

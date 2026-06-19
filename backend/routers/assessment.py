@@ -4,7 +4,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
-import aiosqlite
+import models.pg as aiosqlite
 from dotenv import load_dotenv
 from services.llm_service import generate_assessment_result
 

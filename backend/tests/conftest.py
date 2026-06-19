@@ -1,20 +1,36 @@
-# tests/conftest.py | qa | v1.0
+# tests/conftest.py | qa | v2.0 (Postgres)
 import asyncio
 import os
-import tempfile
+import uuid
 
 import pytest
+from dotenv import load_dotenv
 
-# Set test DB path before any app module is imported by test files.
-# conftest.py is loaded by pytest before test modules, so this env var
-# is visible when routers capture DB_PATH at import time.
-_tmpdir = tempfile.mkdtemp()
-os.environ["DATABASE_URL"] = os.path.join(_tmpdir, "test_coach.db")
+# Loads the real DATABASE_URL (Aliyun Postgres) from backend/.env.
+# conftest.py is loaded by pytest before test modules, so PG_SCHEMA is
+# visible when routers/models.pg capture it at import time. Tests run
+# inside their own throwaway Postgres schema instead of a temp SQLite
+# file, so they never touch real app data.
+load_dotenv()
+os.environ.setdefault("PG_SCHEMA", f"pytest_{uuid.uuid4().hex[:8]}")
 
 
 @pytest.fixture(scope="session", autouse=True)
 def init_test_database():
-    # ASGITransport does not trigger the app lifespan, so we initialize
-    # the DB tables explicitly before any test runs.
     from models.db import init_db
     asyncio.run(init_db())
+    yield
+    _drop_test_schema()
+
+
+def _drop_test_schema():
+    import asyncpg
+
+    async def _drop():
+        conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+        try:
+            await conn.execute(f'DROP SCHEMA IF EXISTS "{os.environ["PG_SCHEMA"]}" CASCADE')
+        finally:
+            await conn.close()
+
+    asyncio.run(_drop())

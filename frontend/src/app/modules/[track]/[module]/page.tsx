@@ -192,7 +192,9 @@ export default function ModuleStagePage() {
           jdContext = p.jd_text ?? ''
         }
       }
-      if (PROBLEM_BACKED.has(moduleName)) {
+      // Only "apply" reuses the candidate's self-selected problem. "master" leaves
+      // problem_context empty so the AI invents a fresh problem itself (see SCENE_PROMPTS).
+      if (PROBLEM_BACKED.has(moduleName) && selectedStage === 'apply') {
         const probRes = await fetch(`${API_URL}/api/modules/problem/latest?track=${track}&module=${moduleName}`, { headers })
         if (probRes.ok) {
           const prob = await probRes.json()

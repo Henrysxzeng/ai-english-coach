@@ -29,6 +29,13 @@ async def init_db():
                 problem_context TEXT DEFAULT ''
             )
         """)
+        try:
+            # CREATE TABLE IF NOT EXISTS above is a no-op once the table already exists in
+            # production (it was first created in the Phase 1 migration) — new columns added
+            # to the schema after that need an explicit ALTER TABLE migration.
+            await db.execute("ALTER TABLE sessions ADD COLUMN problem_context TEXT DEFAULT ''")
+        except Exception:
+            pass  # column already exists
         await db.execute("""
             CREATE TABLE IF NOT EXISTS messages (
                 id SERIAL PRIMARY KEY,

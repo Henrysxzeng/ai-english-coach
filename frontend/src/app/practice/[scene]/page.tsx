@@ -43,6 +43,9 @@ function PracticeContent({ scene }: { scene: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const sessionId = searchParams.get('session_id') ?? ''
+  const moduleTrack = searchParams.get('track') ?? ''
+  const moduleName = searchParams.get('module') ?? ''
+  const moduleStage = searchParams.get('stage') ?? ''
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [correction, setCorrection] = useState<Correction | null>(null)
@@ -437,7 +440,10 @@ function PracticeContent({ scene }: { scene: string }) {
     if (isEnding) return
     setIsEnding(true)
     try { await fetch(`${API_URL}/api/session/${sessionId}/end`, { method: 'POST' }) } catch { /* Continue even if end fails */ }
-    router.push(`/report/${sessionId}`)
+    const moduleQuery = moduleTrack && moduleName && moduleStage
+      ? `?track=${moduleTrack}&module=${moduleName}&stage=${moduleStage}`
+      : ''
+    router.push(`/report/${sessionId}${moduleQuery}`)
   }
 
   if (!sessionId) {

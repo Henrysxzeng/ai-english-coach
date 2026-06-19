@@ -2,9 +2,10 @@
 // owner: Frontend Engineer
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import WordTooltip from '@/components/WordTooltip'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -55,6 +56,13 @@ interface Report {
       result: boolean
     }
     star_feedback: string
+    strengths: string[]
+    improvements: string[]
+    sample_rewrite: string
+  } | null
+  module_feedback?: {
+    communication_score: number
+    clarity_score: number
     strengths: string[]
     improvements: string[]
     sample_rewrite: string
@@ -168,12 +176,21 @@ function coachAdvice(weakAreas: string[], score: number): { nextDiff: string; fo
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function ReportPage() {
+function ReportContent() {
   const params = useParams()
   const sessionId = params.sessionId as string
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const { getToken } = useAuth()
+  const moduleTrack = searchParams.get('track') ?? ''
+  const moduleName = searchParams.get('module') ?? ''
+  const moduleStage = searchParams.get('stage') ?? ''
+  const isModulePractice = !!(moduleTrack && moduleName && moduleStage)
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [advancing, setAdvancing] = useState(false)
+  const [advanced, setAdvanced] = useState(false)
 
   useEffect(() => {
     fetch(`${API_URL}/api/report/${sessionId}`)
@@ -181,6 +198,27 @@ export default function ReportPage() {
       .then(setReport)
       .catch((e: Error) => setError(e.message))
   }, [sessionId])
+
+  async function handleMarkStageComplete() {
+    if (advancing || advanced) return
+    setAdvancing(true)
+    try {
+      const token = await getToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_URL}/api/modules/advance`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ track: moduleTrack, module: moduleName, stage: moduleStage }),
+      })
+      if (res.ok) {
+        setAdvanced(true)
+        setTimeout(() => router.push(`/modules/${moduleTrack}/${moduleName}`), 1200)
+      }
+    } catch {} finally {
+      setAdvancing(false)
+    }
+  }
 
   if (error) {
     return (
@@ -516,6 +554,69 @@ export default function ReportPage() {
           </div>
         )}
 
+        {/* 8b. Module Practice Feedback (technical_explain/system_design/debug modules) */}
+        {report.module_feedback && (
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.08)]">
+            <h2 className="font-semibold text-gray-800 mb-4">🎯 Module Practice Feedback</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Communication Score</p>
+                <p className="text-4xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
+                  {report.module_feedback.communication_score}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">/ 100</p>
+              </div>
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Clarity Score</p>
+                <p className="text-4xl font-bold bg-gradient-to-r from-rose-400 to-pink-500 bg-clip-text text-transparent">
+                  {report.module_feedback.clarity_score}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">/ 100</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm font-medium text-green-600 mb-2">✅ Strengths</p>
+                <ul className="space-y-1">
+                  {report.module_feedback.strengths.map((s, i) => (
+                    <li key={i} className="text-sm text-gray-600">• {s}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-rose-500 mb-2">⚠️ Areas to Improve</p>
+                <ul className="space-y-1">
+                  {report.module_feedback.improvements.map((s, i) => (
+                    <li key={i} className="text-sm text-gray-600">• {s}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            {report.module_feedback.sample_rewrite && (
+              <div className="border-l-4 border-rose-300 pl-4 mt-4">
+                <p className="text-xs text-rose-400 font-medium mb-1">💡 Try saying it like this:</p>
+                <p className="text-sm text-gray-600 italic">{report.module_feedback.sample_rewrite}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 8c. Module stage completion */}
+        {isModulePractice && (
+          <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.08)] text-center print:hidden">
+            <p className="text-sm text-gray-500 mb-4">
+              这是「{moduleName}」模块 {moduleStage} 阶段的练习。如果你已经能脱稿讲出来了，标记完成解锁下一步。
+            </p>
+            <button
+              onClick={handleMarkStageComplete}
+              disabled={advancing || advanced}
+              className="px-8 py-3 bg-gradient-to-r from-rose-400 to-pink-500 text-white font-semibold rounded-xl shadow-[0_4px_16px_rgba(244,63,94,0.28)] hover:shadow-[0_6px_24px_rgba(244,63,94,0.38)] hover:scale-[1.02] transition-all duration-200 disabled:opacity-60"
+            >
+              {advanced ? '✅ 已标记完成，跳转中…' : advancing ? '提交中…' : '✅ 标记本阶段完成 →'}
+            </button>
+          </div>
+        )}
+
         {/* 9. Highlights */}
         {report.highlights?.length > 0 && (
           <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)]">
@@ -554,5 +655,19 @@ export default function ReportPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+// ─── Page export (wraps with Suspense for useSearchParams) ────────────────────
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={
+      <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-rose-50 via-white to-pink-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin" />
+      </div>
+    }>
+      <ReportContent />
+    </Suspense>
   )
 }

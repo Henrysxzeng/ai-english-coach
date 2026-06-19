@@ -177,6 +177,11 @@ export default function HomePage() {
               <p className="text-[10px] font-semibold text-rose-400/80 uppercase tracking-widest px-3 mb-1">
                 Special
               </p>
+              <Link href="/modules"
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-white/30 border border-transparent transition-all duration-200 group">
+                <span className="text-[18px] leading-none">🗺️</span>
+                <span className="text-sm font-medium text-gray-600 group-hover:text-rose-500 transition-colors">Module Map</span>
+              </Link>
               <Link href="/sde-interview"
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-white/30 border border-transparent transition-all duration-200 group">
                 <span className="text-[18px] leading-none">🧑‍💻</span>

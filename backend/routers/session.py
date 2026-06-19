@@ -24,6 +24,13 @@ SCENE_OPENERS = {
     "sde_behavioral": "Welcome! Let's get started with some behavioral questions. Could you begin by telling me about yourself and what drew you to software engineering?",
     "sde_project": "Thanks for joining! I'd love to dive into your technical background. Could you walk me through a recent project you're most proud of — what it did and your role in it?",
     "sde_thinking": "Great, let's begin! I'll ask questions to explore your technical reasoning. First — can you explain the difference between a stack and a queue, and describe a scenario where you'd choose one over the other?",
+    "sde_technical_explain": "Alright, let's go through this problem together. Why don't you start by restating it in your own words, and walk me through how you'd approach it?",
+    "sde_debug": "Take a look at this code with me. Can you start by telling me what you'd check first?",
+    "ds_resume_deep_dive": "Thanks for joining! I'd love to dive into your data science background. Could you walk me through a recent project you're most proud of — what it did and your role in it?",
+    "ds_behavioral": "Welcome! Let's get started with some behavioral questions. Could you begin by telling me about yourself and what drew you to data science?",
+    "ds_technical_explain": "Alright, let's go through this case together. Why don't you start by restating the question in your own words, and walk me through your approach?",
+    "ds_system_design": "Let's talk through an experiment or pipeline design problem. Can you start by telling me what questions you'd ask before designing it?",
+    "ds_debug": "Take a look at this issue with me. Can you start by telling me what you'd check first?",
 }
 
 VALID_SCENES = set(SCENE_OPENERS.keys())
@@ -40,12 +47,13 @@ async def create_session(data: SessionCreate):
     difficulty = data.difficulty if data.difficulty in ("easy", "medium", "hard") else "medium"
     resume_context = data.resume_context or ""
     jd_context = data.jd_context or ""
+    problem_context = data.problem_context or ""
 
     previous_analysis = None
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO sessions (id, scene, status, created_at, difficulty, resume_context, jd_context) VALUES (?, ?, 'active', ?, ?, ?, ?)",
-            (session_id, data.scene, now, difficulty, resume_context, jd_context),
+            "INSERT INTO sessions (id, scene, status, created_at, difficulty, resume_context, jd_context, problem_context) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)",
+            (session_id, data.scene, now, difficulty, resume_context, jd_context, problem_context),
         )
         await db.execute(
             "INSERT INTO messages (session_id, role, content, turn_id, created_at) VALUES (?, 'assistant', ?, 0, ?)",
@@ -79,6 +87,7 @@ async def create_session(data: SessionCreate):
         difficulty=difficulty,
         resume_context=resume_context,
         jd_context=jd_context,
+        problem_context=problem_context,
         previous_analysis=previous_analysis,
     )
 
@@ -104,6 +113,7 @@ async def get_session(session_id: str):
         "difficulty": session["difficulty"],
         "resume_context": session["resume_context"] or "",
         "jd_context": session["jd_context"] or "",
+        "problem_context": session["problem_context"] or "",
         "messages": messages,
         "created_at": session["created_at"],
     }

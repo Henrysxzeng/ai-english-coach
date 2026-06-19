@@ -8,6 +8,7 @@ class SessionCreate(BaseModel):
     difficulty: str = "medium"
     resume_context: str = ""
     jd_context: str = ""
+    problem_context: str = ""
 
 
 class SessionResponse(BaseModel):
@@ -18,7 +19,33 @@ class SessionResponse(BaseModel):
     difficulty: str = "medium"
     resume_context: str = ""
     jd_context: str = ""
+    problem_context: str = ""
     previous_analysis: Optional[Any] = None
+
+
+class ModuleProfileUpdate(BaseModel):
+    resume_text: str = ""
+    jd_text: str = ""
+    track_focus: str = "sde"
+
+
+class ModuleScriptRequest(BaseModel):
+    track: str
+    module: str
+    regenerate: bool = False
+
+
+class ModuleProblemCreate(BaseModel):
+    track: str
+    module: str
+    title: str
+    description: str = ""
+
+
+class ModuleAdvanceRequest(BaseModel):
+    track: str
+    module: str
+    stage: str
 
 
 class MessageResponse(BaseModel):

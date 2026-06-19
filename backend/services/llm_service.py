@@ -99,6 +99,66 @@ SCENE_PROMPTS = {
         "One question at a time. Keep your total response under 3 sentences. "
         + _HUMAN_STYLE
     ),
+    "sde_technical_explain": (
+        "You are a technical interviewer running a live coding interview. The candidate has a specific "
+        "problem in front of them (given as [Problem Context] below) and must talk through it OUT LOUD "
+        "as if thinking step by step — restating the problem, discussing edge cases, walking through their "
+        "approach, and stating time/space complexity at the end. "
+        "Ask sharp clarifying follow-ups like a real interviewer would: 'What's the time complexity of that?', "
+        "'What if the input is empty?', 'Can you walk me through that loop?'. One prompt at a time. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "sde_debug": (
+        "You are a senior engineer pair-debugging with the candidate on a piece of buggy code (given as "
+        "[Problem Context] below). Ask them to walk through their debugging process OUT LOUD: what they'd "
+        "check first, how they'd narrow down the root cause, what tools or logs they'd reach for. "
+        "Push for specifics — 'How would you confirm that's actually the issue?'. One prompt at a time. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "ds_resume_deep_dive": (
+        "You are a technical interviewer for a Data Scientist role conducting a project deep-dive interview. "
+        "Ask about modeling choices, feature engineering, data pipeline design, metric selection, and "
+        "trade-offs in past projects. One question at a time. React briefly (1 sentence), then probe deeper. "
+        "If a resume is provided, ask specifically about the projects listed. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "ds_behavioral": (
+        "You are a Senior Data Scientist interviewer at a top US tech company conducting a behavioral interview. "
+        "Use the STAR framework (Situation, Task, Action, Result) to evaluate answers. "
+        "Ask ONE behavioral question at a time. Topics: teamwork, conflict resolution, failure/learning, leadership, time pressure. "
+        "If candidate context is provided, reference it to make questions more personalized. "
+        "After each answer, ask ONE brief follow-up (e.g. 'What would you do differently?'). "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "ds_technical_explain": (
+        "You are a technical interviewer for a Data Scientist role. The candidate has a SQL query or "
+        "analytical case in front of them (given as [Problem Context] below) and must talk through their "
+        "approach OUT LOUD — restating the question, stating assumptions, walking through their query logic "
+        "or statistical method, and explaining why. Ask clarifying follow-ups like 'What if there are "
+        "duplicate rows?', 'Why a LEFT JOIN there?', 'How would you validate that result?'. One prompt at a time. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "ds_system_design": (
+        "You are a technical interviewer for a Data Scientist role assessing experiment design and data "
+        "pipeline thinking. Ask about A/B test design, sample size reasoning, metric trade-offs, or how "
+        "they'd design a data pipeline or feature store for a given scenario. Keep questions conversational "
+        "— you want to understand how they think, not test memorization. One question at a time. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "ds_debug": (
+        "You are a senior data scientist pair-debugging with the candidate on a broken model or data "
+        "pipeline (given as [Problem Context] below). Ask them to walk through their debugging process OUT "
+        "LOUD: what they'd check first (data drift? leakage? a pipeline bug?), how they'd narrow down the "
+        "root cause, what they'd look at in the logs or metrics. Push for specifics. One prompt at a time. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
 }
 
 DIFFICULTY_SUFFIX = {
@@ -162,6 +222,7 @@ async def get_ai_response_stream(
     jd_context: str = "",
     personality: str = "friendly",
     vocab_hints: list | None = None,
+    problem_context: str = "",
 ):
     """流式生成 AI 回复，逐块 yield，降低首字延迟。"""
     system_prompt = (
@@ -176,6 +237,8 @@ async def get_ai_response_stream(
         context_parts.append(f"Job Description: {jd_context}")
     if context_parts:
         system_prompt += "\n\n[Candidate Context]\n" + "\n".join(context_parts) + "\nUse this context to make your questions more personalized and relevant."
+    if problem_context:
+        system_prompt += f"\n\n[Problem Context]\n{problem_context}\nThe candidate is working through this specific problem — keep your questions grounded in it."
 
     # 自适应难度：根据用户最近一次回答的长度动态微调（最近发展区 i+1）
     last_user = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
@@ -659,6 +722,153 @@ async def generate_interview_feedback(
             "star_feedback": "Good effort. Try to quantify your results more clearly.",
             "strengths": ["Clear communication"],
             "improvements": ["Add quantifiable results to your answers"],
+            "sample_rewrite": "",
+        }
+
+
+ROLE_LABEL = {"sde": "software engineer", "ds": "data scientist"}
+
+
+async def generate_self_intro_script(resume_text: str = "", track: str = "sde") -> str:
+    """生成一份可背诵的自我介绍稿（自我介绍模块 learn 阶段用）。"""
+    role = ROLE_LABEL.get(track, "software engineer")
+    prompt = (
+        f"Write a natural, spoken-style self-introduction script (60-90 seconds when read aloud, "
+        f"~150-180 words) for a {role} candidate to memorize for English interviews. "
+        + (f"Base it on this resume: {resume_text}" if resume_text else
+           "No resume was provided — write a solid generic template the candidate can personalize.")
+        + " Structure: who you are + background (1-2 sentences) -> most relevant experience/projects "
+        "(2-3 sentences with specifics) -> what you're looking for / why this kind of role (1 sentence). "
+        "Sound like natural spoken English, not a written bio — use contractions, vary sentence length. "
+        "Output ONLY the script text, no labels or markdown."
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.6,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return (
+            f"Hi, I'm [Your Name], a {role} with a background in [your domain]. "
+            "Most recently, I worked on [a project] where I [your specific contribution and a measurable result]. "
+            "I'm looking for a role where I can [what you're looking for next]."
+        )
+
+
+async def generate_resume_corpus(resume_text: str = "", track: str = "sde") -> list[dict]:
+    """生成简历深挖语料库（简历深挖模块 learn 阶段用）：常见追问 + 建议答法。"""
+    role = ROLE_LABEL.get(track, "software engineer")
+    prompt = (
+        f"You are prepping a {role} candidate for a resume/project deep-dive interview.\n"
+        f"Resume: {resume_text or '(no resume provided — use generic but realistic example projects)'}\n\n"
+        "Generate 5-6 likely deep-dive questions an interviewer would ask about this resume's projects, "
+        "each with a suggested model answer (2-3 sentences, specific, quantified where possible). "
+        'Reply ONLY with JSON: [{"question": str, "suggested_answer": str}, ...]'
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=900,
+            temperature=0.5,
+        )
+        text = response.choices[0].message.content.strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
+        return result[:8]
+    except Exception:
+        return [{
+            "question": "Walk me through one of your recent projects.",
+            "suggested_answer": "Describe the problem, your specific contribution, and a measurable result.",
+        }]
+
+
+async def generate_explanation_script(track: str, module: str, problem_text: str) -> str:
+    """生成技术模块(technical_explain/system_design/debug) learn 阶段的口头讲解示范稿。"""
+    role = ROLE_LABEL.get(track, "software engineer")
+    topic_label = {
+        "technical_explain": "a coding/algorithm problem" if track == "sde" else "a SQL or analytical case",
+        "system_design": "a system design problem" if track == "sde" else "an experiment or data-pipeline design problem",
+        "debug": "a debugging scenario",
+    }.get(module, "a technical problem")
+    prompt = (
+        f"You are coaching a {role} candidate on how to TALK THROUGH {topic_label} out loud in an interview.\n"
+        f"Problem: {problem_text}\n\n"
+        "Write a model spoken-style walkthrough script (200-280 words) that:\n"
+        "- restates the problem/goal in their own words\n"
+        "- states assumptions or asks clarifying questions\n"
+        "- explains the approach step by step\n"
+        "- ends with complexity/trade-offs or how they'd validate the result\n"
+        "Sound like natural spoken English (contractions, thinking-out-loud phrasing like 'so my first "
+        "thought is...'), not a written essay. Output ONLY the script text."
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.6,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return (
+            f"Let's think through this together: first, restate the problem in your own words, then talk "
+            f"through your approach for {problem_text[:80]}, and finish with the complexity and any trade-offs."
+        )
+
+
+async def generate_module_feedback(track: str, module: str, messages: list[dict]) -> dict:
+    """泛化版的模块练习反馈（technical_explain/system_design/debug 等模块的模拟结束总结）。"""
+    user_messages = [m["content"] for m in messages if m["role"] == "user"]
+    if len(user_messages) < 2:
+        return {
+            "communication_score": 0,
+            "clarity_score": 0,
+            "strengths": [],
+            "improvements": ["Complete at least 2 turns to receive feedback."],
+            "sample_rewrite": "",
+        }
+    conversation = "\n".join(f"Candidate: {m}" for m in user_messages)
+    prompt = (
+        f"You are an interview coach evaluating a candidate's spoken answers for the '{module}' practice "
+        f"module ({track} track).\n\nConversation:\n{conversation}\n\n"
+        "Reply ONLY with JSON:\n"
+        '{"communication_score": <int 0-100>, "clarity_score": <int 0-100>, '
+        '"strengths": ["<str>", "<str>"], "improvements": ["<str>", "<str>"], '
+        '"sample_rewrite": "<suggested rewrite of the weakest answer>"}\n'
+        "Output only the JSON."
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.2,
+        )
+        text = response.choices[0].message.content.strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
+        result.setdefault("communication_score", 60)
+        result.setdefault("clarity_score", 60)
+        result.setdefault("strengths", [])
+        result.setdefault("improvements", [])
+        result.setdefault("sample_rewrite", "")
+        return result
+    except Exception:
+        return {
+            "communication_score": 60,
+            "clarity_score": 60,
+            "strengths": ["Clear communication"],
+            "improvements": ["Add more specific detail"],
             "sample_rewrite": "",
         }
 

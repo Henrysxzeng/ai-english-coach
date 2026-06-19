@@ -60,7 +60,7 @@ class _Connection:
     async def execute(self, query, params=()):
         pg_query = _to_pg(query)
         stripped = pg_query.strip().upper()
-        if stripped.startswith("SELECT") or stripped.startswith("WITH"):
+        if stripped.startswith("SELECT") or stripped.startswith("WITH") or " RETURNING " in stripped:
             rows = await self._conn.fetch(pg_query, *params)
         else:
             await self._conn.execute(pg_query, *params)

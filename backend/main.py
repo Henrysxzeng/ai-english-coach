@@ -11,6 +11,7 @@ from routers.pronunciation import router as pronunciation_router
 from routers.afdian import router as afdian_router
 from routers.vocab import router as vocab_router
 from routers.tts import router as tts_router
+from routers.modules import router as modules_router
 
 
 @asynccontextmanager
@@ -39,6 +40,7 @@ app.include_router(pronunciation_router)
 app.include_router(afdian_router)
 app.include_router(vocab_router)
 app.include_router(tts_router)
+app.include_router(modules_router)
 
 
 @app.get("/health")

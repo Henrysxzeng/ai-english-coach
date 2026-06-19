@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 from datetime import datetime
-import aiosqlite
+import models.pg as aiosqlite
 from models.db import DB_PATH
 
 router = APIRouter()
@@ -54,8 +54,10 @@ async def link_pro(request: Request):
             return {"success": False, "error": "no_order_found"}
 
         await db.execute(
-            """INSERT OR REPLACE INTO pro_users (clerk_user_id, afdian_user_id, created_at)
-               VALUES (?, ?, datetime('now'))""",
+            """INSERT INTO pro_users (clerk_user_id, afdian_user_id, created_at)
+               VALUES (?, ?, NOW())
+               ON CONFLICT (clerk_user_id) DO UPDATE
+               SET afdian_user_id = excluded.afdian_user_id, created_at = excluded.created_at""",
             (clerk_uid, afdian_uid),
         )
         await db.execute(

@@ -1,6 +1,6 @@
 from datetime import date as _date
 from fastapi import APIRouter, Form, Request, UploadFile, File, HTTPException
-import aiosqlite
+import models.pg as aiosqlite
 from models.db import DB_PATH
 from services.pronunciation_service import assess_pronunciation, transcribe_only, assess_shadowing
 from utils.auth import get_clerk_user_id, get_admin_user_ids, get_pro_user_ids

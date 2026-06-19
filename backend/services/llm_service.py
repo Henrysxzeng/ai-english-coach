@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import json
 import asyncio
-import aiosqlite
+import models.pg as aiosqlite
 from datetime import datetime, timezone
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -465,11 +465,22 @@ async def generate_report_scores(session_id: str, messages: list, corrections: l
 
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
-                """INSERT OR REPLACE INTO session_analyses
+                """INSERT INTO session_analyses
                 (session_id, scene, topic, clarity_score, structure_score,
                  weak_areas, ambiguous_expressions,
                  overall_score, grammar_errors, vocabulary_score, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (session_id) DO UPDATE SET
+                    scene = excluded.scene,
+                    topic = excluded.topic,
+                    clarity_score = excluded.clarity_score,
+                    structure_score = excluded.structure_score,
+                    weak_areas = excluded.weak_areas,
+                    ambiguous_expressions = excluded.ambiguous_expressions,
+                    overall_score = excluded.overall_score,
+                    grammar_errors = excluded.grammar_errors,
+                    vocabulary_score = excluded.vocabulary_score,
+                    created_at = excluded.created_at""",
                 (
                     session_id,
                     scene_val,

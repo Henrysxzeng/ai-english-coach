@@ -4,7 +4,7 @@ import json
 import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import aiosqlite
+import models.pg as aiosqlite
 from dotenv import load_dotenv
 from services.llm_service import get_ai_response, get_ai_response_stream, evaluate_correction, evaluate_upgrade, generate_memory_greeting
 

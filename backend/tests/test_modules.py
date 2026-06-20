@@ -238,3 +238,41 @@ def test_resumes_require_auth():
             assert resp.status_code == 401
         return resp
     _run(_())
+
+
+def test_pm_track_scene_mapping():
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get("/api/modules/scene", params={"track": "pm", "module": "technical_explain", "stage": "master"})
+            assert resp.status_code == 200
+            assert resp.json()["scene"] == "pm_product_sense"
+
+            resp2 = await c.get("/api/modules/scene", params={"track": "pm", "module": "system_design", "stage": "apply"})
+            assert resp2.status_code == 200
+            assert resp2.json()["scene"] == "pm_metrics_execution"
+
+            resp3 = await c.post("/api/session/create", json={"scene": "pm_estimation_strategy"})
+            assert resp3.status_code == 200
+        return resp
+    _run(_())
+
+
+def test_pm_behavioral_generates_corpus_not_static_marker():
+    async def _():
+        with _auth_patch(), patch(
+            "routers.modules.generate_behavioral_corpus",
+            new=AsyncMock(return_value=[{"question": "Tell me about a time...", "suggested_answer": "Situation, task, action, result."}]),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                headers = {"Authorization": "Bearer x"}
+                await c.post("/api/modules/advance", json={"track": "pm", "module": "self_intro", "stage": "learn"}, headers=headers)
+                await c.post("/api/modules/advance", json={"track": "pm", "module": "resume_deep_dive", "stage": "learn"}, headers=headers)
+                await c.post("/api/modules/advance", json={"track": "pm", "module": "resume_deep_dive", "stage": "master"}, headers=headers)
+
+                resp = await c.post("/api/modules/script", json={"track": "pm", "module": "behavioral"}, headers=headers)
+                assert resp.status_code == 200
+                data = resp.json()
+                assert data["content_type"] == "corpus"
+                assert data["content"][0]["question"] == "Tell me about a time..."
+        return resp
+    _run(_())

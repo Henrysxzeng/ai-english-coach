@@ -23,13 +23,13 @@ const MODULE_STAGES: Record<string, string[]> = {
 const PROBLEM_BACKED = new Set(['technical_explain', 'system_design', 'debug'])
 const NEEDS_PROFILE = new Set(['self_intro', 'resume_deep_dive'])
 
-const MODULE_META: Record<string, { icon: string; title: string }> = {
-  self_intro: { icon: '🙋', title: '自我介绍' },
-  resume_deep_dive: { icon: '📄', title: '简历深挖' },
-  behavioral: { icon: '🗣️', title: '行为面试 (STAR)' },
-  technical_explain: { icon: '🧩', title: '算法/SQL讲解' },
-  system_design: { icon: '🏗️', title: '系统设计' },
-  debug: { icon: '🐛', title: 'Debug' },
+const MODULE_META: Record<string, { icon: string; title: Record<string, string> }> = {
+  self_intro: { icon: '🙋', title: { sde: '自我介绍', ds: '自我介绍', pm: '自我介绍' } },
+  resume_deep_dive: { icon: '📄', title: { sde: '简历深挖', ds: '简历深挖', pm: '产品复盘' } },
+  behavioral: { icon: '🗣️', title: { sde: '行为面试 (STAR)', ds: '行为面试 (STAR)', pm: '行为面试 (STAR)' } },
+  technical_explain: { icon: '🧩', title: { sde: '算法讲解', ds: 'SQL讲解', pm: 'Product Sense' } },
+  system_design: { icon: '🏗️', title: { sde: '系统设计', ds: '实验设计', pm: '指标与执行' } },
+  debug: { icon: '🐛', title: { sde: 'Debug', ds: 'Debug', pm: '估算与排序' } },
 }
 
 export default function ModuleStagePage() {
@@ -243,7 +243,7 @@ export default function ModuleStagePage() {
         <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.08)]">
           <div className="flex items-center gap-3 mb-1">
             <span className="text-3xl">{meta.icon}</span>
-            <h1 className="text-xl font-bold text-gray-800">{meta.title}</h1>
+            <h1 className="text-xl font-bold text-gray-800">{meta.title[track] ?? meta.title.sde}</h1>
             <span className="text-xs bg-rose-50 border border-rose-100 text-rose-500 px-2 py-0.5 rounded-full">{track.toUpperCase()}</span>
           </div>
         </div>
@@ -328,7 +328,7 @@ export default function ModuleStagePage() {
             {/* learn stage content */}
             {selectedStage === 'learn' && (
               <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)] space-y-4">
-                {moduleName === 'behavioral' ? (
+                {moduleName === 'behavioral' && (track === 'sde' || track === 'ds') ? (
                   <div className="text-center space-y-3">
                     <p className="text-sm text-gray-500">行为面试用现成的题库 + STAR 范例答案来背</p>
                     <Link href="/sde-interview" className="inline-block px-5 py-2 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-xl text-sm font-medium">

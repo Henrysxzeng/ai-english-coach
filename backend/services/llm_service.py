@@ -168,6 +168,61 @@ SCENE_PROMPTS = {
         "logs or metrics. Push for specifics. One prompt at a time. Keep your total response under 3 sentences. "
         + _HUMAN_STYLE
     ),
+    "pm_resume_deep_dive": (
+        "You are a senior PM interviewer conducting a project deep-dive interview. "
+        "Ask about a product/feature the candidate shipped: the problem, their decision process, trade-offs, "
+        "and the measurable outcome. One question at a time. React briefly (1 sentence), then probe deeper — "
+        "push for specifics like 'what data backed that decision?' or 'what would you do differently?'. "
+        "If a resume is provided, ask specifically about the projects listed. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "pm_behavioral": (
+        "You are a Senior Product Manager interviewer at a top US tech company conducting a behavioral interview. "
+        "Use the STAR framework (Situation, Task, Action, Result) to evaluate answers. "
+        "Ask ONE behavioral question at a time, focused on PM-flavored scenarios: leading without formal "
+        "authority, conflict with a stakeholder or engineer, prioritization under pressure, driving something "
+        "end-to-end, influencing without a title. "
+        "If candidate context is provided, reference it to make questions more personalized. "
+        "After each answer, ask ONE brief follow-up (e.g. 'What would you do differently?'). "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "pm_product_sense": (
+        "You are a PM interviewer running a product sense / product design round. "
+        "If a specific product design prompt is given in [Problem Context] below, use that one. "
+        "If none is given, invent a realistic 'design/improve a product for X user group' prompt yourself "
+        "and present it to the candidate first in 1-2 sentences. "
+        "Either way, the candidate must talk through their approach OUT LOUD — clarifying the target user and "
+        "goal, brainstorming solutions, picking one with reasoning, and defining how they'd measure success. "
+        "Ask sharp follow-ups like a real interviewer would: 'Why that user segment?', 'What's the trade-off "
+        "there?', 'How would you validate that before building it?'. One prompt at a time. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "pm_metrics_execution": (
+        "You are a PM interviewer running a metrics & execution round. "
+        "If a specific scenario is given in [Problem Context] below, use that one. "
+        "If none is given, invent a realistic one yourself (e.g. 'engagement on feature X dropped 10% last "
+        "week', or 'define the north star metric for product Y') and present it first in 1-2 sentences. "
+        "Either way, the candidate must talk through their approach OUT LOUD — defining the right metrics, "
+        "how they'd set up an A/B test or root-cause a metric drop, and what trade-offs they'd weigh. "
+        "Ask clarifying follow-ups like 'What's your null hypothesis?', 'What else could explain that drop?'. "
+        "One prompt at a time. Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
+    "pm_estimation_strategy": (
+        "You are a PM interviewer running an estimation & prioritization round. "
+        "If a specific scenario is given in [Problem Context] below, use that one. "
+        "If none is given, invent a realistic market-sizing or feature-prioritization scenario yourself "
+        "(e.g. 'estimate daily active users for X', or 'you have 3 features and one quarter, which do you "
+        "ship first and why') and present it first in 1-2 sentences. "
+        "Either way, ask the candidate to talk through their structured reasoning OUT LOUD — stating "
+        "assumptions explicitly, breaking the problem into parts, and sanity-checking the result. "
+        "Push for specifics — 'Where did that number come from?'. One prompt at a time. "
+        "Keep your total response under 3 sentences. "
+        + _HUMAN_STYLE
+    ),
 }
 
 DIFFICULTY_SUFFIX = {
@@ -735,7 +790,7 @@ async def generate_interview_feedback(
         }
 
 
-ROLE_LABEL = {"sde": "software engineer", "ds": "data scientist"}
+ROLE_LABEL = {"sde": "software engineer", "ds": "data scientist", "pm": "product manager"}
 
 
 async def generate_self_intro_script(resume_text: str = "", track: str = "sde") -> str:
@@ -798,14 +853,58 @@ async def generate_resume_corpus(resume_text: str = "", track: str = "sde") -> l
         }]
 
 
+async def generate_behavioral_corpus(track: str = "pm") -> list[dict]:
+    """生成行为面试(STAR)语料库：常见追问 + 建议答法。SDE/DS 复用前端现成题库，这个函数目前只给没有现成题库的赛道(如 pm)用。"""
+    role = ROLE_LABEL.get(track, "product manager")
+    prompt = (
+        f"You are prepping a {role} candidate for a behavioral interview (STAR framework).\n"
+        "Generate 6 common behavioral questions for this role — covering leading without authority, "
+        "conflict with a stakeholder, prioritization under pressure, driving something end-to-end, and "
+        "failure/learning — each with a suggested model answer (2-3 sentences, specific, using STAR shape, "
+        "quantified where possible). "
+        'Reply ONLY with JSON: [{"question": str, "suggested_answer": str}, ...]'
+    )
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=900,
+            temperature=0.5,
+        )
+        text = response.choices[0].message.content.strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
+        return result[:8]
+    except Exception:
+        return [{
+            "question": "Tell me about a time you had to lead without formal authority.",
+            "suggested_answer": "Describe the situation, your specific actions to build buy-in, and the measurable outcome.",
+        }]
+
+
 async def generate_explanation_script(track: str, module: str, problem_text: str) -> str:
     """生成技术模块(technical_explain/system_design/debug) learn 阶段的口头讲解示范稿。"""
     role = ROLE_LABEL.get(track, "software engineer")
     topic_label = {
-        "technical_explain": "a coding/algorithm problem" if track == "sde" else "a SQL or analytical case",
-        "system_design": "a system design problem" if track == "sde" else "an experiment or data-pipeline design problem",
-        "debug": "a debugging scenario",
-    }.get(module, "a technical problem")
+        "sde": {
+            "technical_explain": "a coding/algorithm problem",
+            "system_design": "a system design problem",
+            "debug": "a debugging scenario",
+        },
+        "ds": {
+            "technical_explain": "a SQL or analytical case",
+            "system_design": "an experiment or data-pipeline design problem",
+            "debug": "a debugging scenario",
+        },
+        "pm": {
+            "technical_explain": "a product sense / product design case",
+            "system_design": "a metrics & execution case",
+            "debug": "an estimation or feature-prioritization case",
+        },
+    }.get(track, {}).get(module, "a technical problem")
     prompt = (
         f"You are coaching a {role} candidate on how to TALK THROUGH {topic_label} out loud in an interview.\n"
         f"Problem: {problem_text}\n\n"

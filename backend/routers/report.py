@@ -8,14 +8,21 @@ import models.pg as aiosqlite
 from dotenv import load_dotenv
 from services.llm_service import generate_report_scores, generate_interview_feedback, generate_module_feedback
 
-STAR_FEEDBACK_SCENES = {"sde_behavioral", "sde_project", "sde_thinking", "ds_behavioral", "ds_resume_deep_dive"}
-MODULE_FEEDBACK_SCENES = {"sde_technical_explain", "sde_debug", "ds_technical_explain", "ds_system_design", "ds_debug"}
+STAR_FEEDBACK_SCENES = {"sde_behavioral", "sde_project", "sde_thinking", "ds_behavioral", "ds_resume_deep_dive", "pm_behavioral", "pm_resume_deep_dive"}
+MODULE_FEEDBACK_SCENES = {
+    "sde_technical_explain", "sde_debug",
+    "ds_technical_explain", "ds_system_design", "ds_debug",
+    "pm_product_sense", "pm_metrics_execution", "pm_estimation_strategy",
+}
 SCENE_TO_MODULE = {
     "sde_technical_explain": ("sde", "technical_explain"),
     "sde_debug": ("sde", "debug"),
     "ds_technical_explain": ("ds", "technical_explain"),
     "ds_system_design": ("ds", "system_design"),
     "ds_debug": ("ds", "debug"),
+    "pm_product_sense": ("pm", "technical_explain"),
+    "pm_metrics_execution": ("pm", "system_design"),
+    "pm_estimation_strategy": ("pm", "debug"),
 }
 
 FILLER_RE = r'\b(um+|uh+|hmm+|like|you know|sort of|kind of|basically|literally|i mean)\b'

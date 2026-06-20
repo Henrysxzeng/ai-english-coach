@@ -9,7 +9,7 @@ import { SignInButton, useAuth } from '@clerk/nextjs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-type Track = 'sde' | 'ds'
+type Track = 'sde' | 'ds' | 'pm'
 type StageStatus = 'locked' | 'in_progress' | 'completed'
 
 interface StageInfo {
@@ -23,13 +23,57 @@ interface ModuleInfo {
   stages: StageInfo[]
 }
 
-const MODULE_META: Record<string, { icon: string; title: string; desc: Record<Track, string> }> = {
-  self_intro: { icon: '🙋', title: '自我介绍', desc: { sde: '60-90秒的自我介绍稿，背到脱稿', ds: '60-90秒的自我介绍稿，背到脱稿' } },
-  resume_deep_dive: { icon: '📄', title: '简历深挖', desc: { sde: 'AI 根据简历生成语料库，再真实模拟深挖', ds: 'AI 根据简历生成语料库，再真实模拟深挖' } },
-  behavioral: { icon: '🗣️', title: '行为面试 (STAR)', desc: { sde: 'Teamwork / Conflict / Leadership / Failure', ds: 'Teamwork / Conflict / Leadership / Failure' } },
-  technical_explain: { icon: '🧩', title: '算法/SQL讲解', desc: { sde: '边讲思路边写代码，脱稿讲清楚复杂度', ds: '边讲思路边写SQL/统计方法，脱稿讲清楚假设' } },
-  system_design: { icon: '🏗️', title: '系统设计', desc: { sde: '系统设计/数据结构权衡', ds: '实验设计 / 数据管道设计' } },
-  debug: { icon: '🐛', title: 'Debug', desc: { sde: '边讲思路边定位代码bug', ds: '边讲思路边定位数据/模型问题' } },
+const MODULE_META: Record<string, { icon: string; title: Record<Track, string>; desc: Record<Track, string> }> = {
+  self_intro: {
+    icon: '🙋',
+    title: { sde: '自我介绍', ds: '自我介绍', pm: '自我介绍' },
+    desc: { sde: '60-90秒的自我介绍稿，背到脱稿', ds: '60-90秒的自我介绍稿，背到脱稿', pm: '60-90秒的自我介绍稿，背到脱稿' },
+  },
+  resume_deep_dive: {
+    icon: '📄',
+    title: { sde: '简历深挖', ds: '简历深挖', pm: '产品复盘' },
+    desc: {
+      sde: 'AI 根据简历生成语料库，再真实模拟深挖',
+      ds: 'AI 根据简历生成语料库，再真实模拟深挖',
+      pm: '讲你主导的产品/功能，决策依据和结果指标',
+    },
+  },
+  behavioral: {
+    icon: '🗣️',
+    title: { sde: '行为面试 (STAR)', ds: '行为面试 (STAR)', pm: '行为面试 (STAR)' },
+    desc: {
+      sde: 'Teamwork / Conflict / Leadership / Failure',
+      ds: 'Teamwork / Conflict / Leadership / Failure',
+      pm: '跨团队协作 / 无职权领导 / 利益冲突',
+    },
+  },
+  technical_explain: {
+    icon: '🧩',
+    title: { sde: '算法讲解', ds: 'SQL讲解', pm: 'Product Sense' },
+    desc: {
+      sde: '边讲思路边写代码，脱稿讲清楚复杂度',
+      ds: '边讲思路边写SQL/统计方法，脱稿讲清楚假设',
+      pm: '产品设计/改进题，脱稿讲清楚用户洞察和方案',
+    },
+  },
+  system_design: {
+    icon: '🏗️',
+    title: { sde: '系统设计', ds: '实验设计', pm: '指标与执行' },
+    desc: {
+      sde: '系统设计/数据结构权衡',
+      ds: '实验设计 / 数据管道设计',
+      pm: '定义指标、设计A/B测试、指标下降排查',
+    },
+  },
+  debug: {
+    icon: '🐛',
+    title: { sde: 'Debug', ds: 'Debug', pm: '估算与排序' },
+    desc: {
+      sde: '边讲思路边定位代码bug',
+      ds: '边讲思路边定位数据/模型问题',
+      pm: '市场体量估算 / 多个feature怎么排优先级',
+    },
+  },
 }
 
 const STAGE_LABEL: Record<string, string> = { learn: 'Learn 背稿', apply: 'Apply 自选脱稿', master: 'Master AI出题' }
@@ -108,7 +152,7 @@ export default function ModulesPage() {
         </div>
 
         <div className="flex items-center justify-center gap-2">
-          {(['sde', 'ds'] as const).map((t) => (
+          {(['sde', 'ds', 'pm'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTrack(t)}
@@ -118,7 +162,7 @@ export default function ModulesPage() {
                   : 'bg-white border border-pink-100 text-gray-500 hover:border-rose-200'
               }`}
             >
-              {t === 'sde' ? '💻 SDE' : '📊 Data Scientist'}
+              {t === 'sde' ? '💻 SDE' : t === 'ds' ? '📊 Data Scientist' : '📋 Product Manager'}
             </button>
           ))}
         </div>
@@ -151,7 +195,7 @@ export default function ModulesPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-xs text-gray-300 font-mono">{i + 1}</span>
-                        <h3 className="font-semibold text-gray-800">{meta?.title ?? m.module}</h3>
+                        <h3 className="font-semibold text-gray-800">{meta?.title[track] ?? m.module}</h3>
                         {allCompleted && <span className="text-green-500 text-sm">✓ 完成</span>}
                       </div>
                       <p className="text-xs text-gray-400 mb-3">{meta?.desc[track] ?? ''}</p>

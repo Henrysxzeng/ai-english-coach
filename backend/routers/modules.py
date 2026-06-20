@@ -19,12 +19,13 @@ from schemas.api_schemas import (
 from services.llm_service import (
     generate_self_intro_script,
     generate_resume_corpus,
+    generate_behavioral_corpus,
     generate_explanation_script,
 )
 
 router = APIRouter(prefix="/api/modules", tags=["modules"])
 
-TRACKS = ("sde", "ds")
+TRACKS = ("sde", "ds", "pm")
 
 MODULE_ORDER = ["self_intro", "resume_deep_dive", "behavioral", "technical_explain", "system_design", "debug"]
 
@@ -58,6 +59,14 @@ MODULE_SCENE_MAP = {
     ("ds", "system_design", "master"): "ds_system_design",
     ("ds", "debug", "apply"): "ds_debug",
     ("ds", "debug", "master"): "ds_debug",
+    ("pm", "resume_deep_dive", "master"): "pm_resume_deep_dive",
+    ("pm", "behavioral", "master"): "pm_behavioral",
+    ("pm", "technical_explain", "apply"): "pm_product_sense",
+    ("pm", "technical_explain", "master"): "pm_product_sense",
+    ("pm", "system_design", "apply"): "pm_metrics_execution",
+    ("pm", "system_design", "master"): "pm_metrics_execution",
+    ("pm", "debug", "apply"): "pm_estimation_strategy",
+    ("pm", "debug", "master"): "pm_estimation_strategy",
 }
 
 
@@ -330,11 +339,15 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
         profile = await cursor.fetchone()
         resume_text = profile["resume_text"] if profile else ""
 
-    if data.module == "behavioral":
-        # 复用前端现成的题库(questions.ts)，不调用 LLM
+    if data.module == "behavioral" and data.track in ("sde", "ds"):
+        # sde/ds 复用前端现成的题库(questions.ts)，不调用 LLM
         return {"module": data.module, "content_type": "static_question_bank", "content": None}
 
-    if data.module == "self_intro":
+    if data.module == "behavioral":
+        # 其他赛道(如 pm)没有现成题库，走 LLM 生成行为面试语料库
+        corpus = await generate_behavioral_corpus(data.track)
+        content_str = json.dumps(corpus, ensure_ascii=False)
+    elif data.module == "self_intro":
         content_str = await generate_self_intro_script(resume_text, data.track)
     elif data.module == "resume_deep_dive":
         corpus = await generate_resume_corpus(resume_text, data.track)
@@ -371,7 +384,7 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
 
 
 def _format_script_response(module: str, content_str: str):
-    if module == "resume_deep_dive":
+    if module in ("resume_deep_dive", "behavioral"):
         try:
             return {"module": module, "content_type": "corpus", "content": json.loads(content_str)}
         except Exception:

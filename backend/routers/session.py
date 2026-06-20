@@ -31,6 +31,11 @@ SCENE_OPENERS = {
     "ds_technical_explain": "Alright, let's go through this case together. Why don't you start by restating the question in your own words, and walk me through your approach?",
     "ds_system_design": "Let's talk through an experiment or pipeline design problem. Can you start by telling me what questions you'd ask before designing it?",
     "ds_debug": "Take a look at this issue with me. Can you start by telling me what you'd check first?",
+    "pm_resume_deep_dive": "Thanks for joining! I'd love to dive into your product background. Could you walk me through a product or feature you're most proud of — the problem, your decisions, and the outcome?",
+    "pm_behavioral": "Welcome! Let's get started with some behavioral questions. Could you begin by telling me about yourself and what drew you to product management?",
+    "pm_product_sense": "Let's dive into a product sense question. Why don't you start by clarifying who the user is and what problem we're solving?",
+    "pm_metrics_execution": "Let's talk through a metrics and execution scenario. Can you start by telling me what metrics you'd look at first?",
+    "pm_estimation_strategy": "Let's work through an estimation problem together. Can you start by telling me what assumptions you'd make?",
 }
 
 VALID_SCENES = set(SCENE_OPENERS.keys())

@@ -48,6 +48,15 @@ class ModuleAdvanceRequest(BaseModel):
     stage: str
 
 
+class UserResumeCreate(BaseModel):
+    label: str
+    resume_text: str
+
+
+class SetActiveResume(BaseModel):
+    resume_id: int
+
+
 class MessageResponse(BaseModel):
     role: str
     content: str

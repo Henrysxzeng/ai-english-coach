@@ -181,3 +181,60 @@ def test_session_create_accepts_new_module_scenes():
             assert data["problem_context"] == "Find top customers"
         return resp
     _run(_())
+
+
+def test_resumes_crud_and_active_selection():
+    async def _():
+        with _auth_patch():
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                headers = {"Authorization": "Bearer x"}
+
+                # no resumes yet
+                empty = await c.get("/api/modules/resumes", headers=headers)
+                assert empty.status_code == 200
+                assert empty.json()["resumes"] == []
+                assert empty.json()["active_resume_id"] is None
+
+                # upload first resume -> auto-becomes active
+                r1 = await c.post("/api/modules/resumes", json={"label": "SDE Resume", "resume_text": "Built things with Python."}, headers=headers)
+                assert r1.status_code == 200
+                id1 = r1.json()["id"]
+
+                listing = await c.get("/api/modules/resumes", headers=headers)
+                assert listing.json()["active_resume_id"] == id1
+                assert len(listing.json()["resumes"]) == 1
+
+                # profile should now resolve resume_text from the active resume
+                profile = await c.get("/api/modules/profile", headers=headers)
+                assert profile.json()["resume_text"] == "Built things with Python."
+                assert profile.json()["active_resume_id"] == id1
+
+                # upload second resume -> becomes the new active one
+                r2 = await c.post("/api/modules/resumes", json={"label": "DS Resume", "resume_text": "Did data science things."}, headers=headers)
+                id2 = r2.json()["id"]
+                profile2 = await c.get("/api/modules/profile", headers=headers)
+                assert profile2.json()["resume_text"] == "Did data science things."
+
+                # switch active back to the first resume
+                switch = await c.post("/api/modules/resumes/active", json={"resume_id": id1}, headers=headers)
+                assert switch.status_code == 200
+                profile3 = await c.get("/api/modules/profile", headers=headers)
+                assert profile3.json()["resume_text"] == "Built things with Python."
+
+                # delete the active resume -> falls back gracefully (no crash)
+                deleted = await c.delete(f"/api/modules/resumes/{id1}", headers=headers)
+                assert deleted.status_code == 200
+                listing2 = await c.get("/api/modules/resumes", headers=headers)
+                assert len(listing2.json()["resumes"]) == 1
+                assert listing2.json()["resumes"][0]["id"] == id2
+        return r1
+    _run(_())
+
+
+def test_resumes_require_auth():
+    async def _():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get("/api/modules/resumes")
+            assert resp.status_code == 401
+        return resp
+    _run(_())

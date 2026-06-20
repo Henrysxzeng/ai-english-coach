@@ -1,9 +1,186 @@
 // file: src/app/career/page.tsx — 求职英语主线着陆页
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { SignInButton, UserButton, useAuth } from '@clerk/nextjs'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+interface ResumeItem {
+  id: number
+  label: string
+  created_at: string
+}
+
+function ResumeManager() {
+  const { getToken } = useAuth()
+  const [resumes, setResumes] = useState<ResumeItem[] | null>(null)
+  const [activeId, setActiveId] = useState<number | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteLabel, setPasteLabel] = useState('')
+  const [pasteText, setPasteText] = useState('')
+
+  async function authHeaders(): Promise<Record<string, string>> {
+    const token = await getToken()
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
+
+  async function load() {
+    const headers = await authHeaders()
+    const res = await fetch(`${API_URL}/api/modules/resumes`, { headers })
+    if (res.ok) {
+      const data = await res.json()
+      setResumes(data.resumes)
+      setActiveId(data.active_resume_id)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function saveResume(label: string, resumeText: string) {
+    const headers = await authHeaders()
+    const res = await fetch(`${API_URL}/api/modules/resumes`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, resume_text: resumeText }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.detail ?? '保存失败')
+    }
+    await load()
+  }
+
+  async function handleFile(file: File) {
+    setUploading(true)
+    setError('')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const resp = await fetch(`${API_URL}/api/parse-resume-pdf`, { method: 'POST', body: formData })
+      if (!resp.ok) {
+        const data = await resp.json()
+        throw new Error(data.detail || '解析失败')
+      }
+      const data = await resp.json()
+      const label = file.name.replace(/\.(pdf|docx?|DOCX?|PDF)$/, '') || `简历 ${new Date().toLocaleDateString()}`
+      await saveResume(label, data.text)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '上传失败，试试直接粘贴文本')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function setActive(id: number) {
+    const headers = await authHeaders()
+    await fetch(`${API_URL}/api/modules/resumes/active`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume_id: id }),
+    })
+    setActiveId(id)
+  }
+
+  async function deleteResume(id: number) {
+    const headers = await authHeaders()
+    await fetch(`${API_URL}/api/modules/resumes/${id}`, { method: 'DELETE', headers })
+    await load()
+  }
+
+  return (
+    <div className="bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-6 mb-8
+      shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-gray-700">📄 我的简历</p>
+        <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg border transition-all duration-200 ${
+          uploading ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-rose-200 text-rose-400 hover:bg-rose-50'
+        }`}>
+          {uploading ? '解析中…' : '+ 上传简历 (PDF/Word)'}
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) handleFile(file)
+              e.target.value = ''
+            }}
+          />
+        </label>
+      </div>
+
+      {error && <p className="text-xs text-rose-500 mb-2">{error}</p>}
+
+      {resumes && resumes.length === 0 && (
+        <p className="text-xs text-gray-400 mb-2">还没有简历，上传一份，或者直接粘贴文本。</p>
+      )}
+
+      {resumes && resumes.length > 0 && (
+        <div className="space-y-1.5 mb-2">
+          {resumes.map((r) => (
+            <div key={r.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+              activeId === r.id ? 'bg-rose-50/80 border-rose-200' : 'bg-white/30 border-white/50'
+            }`}>
+              <button onClick={() => setActive(r.id)} className="flex items-center gap-2 flex-1 text-left">
+                <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                  activeId === r.id ? 'border-rose-400 bg-rose-400' : 'border-gray-300'
+                }`} />
+                <span className="text-sm text-gray-700">{r.label}</span>
+                {activeId === r.id && <span className="text-xs text-rose-500">本次训练使用</span>}
+              </button>
+              <button onClick={() => deleteResume(r.id)} className="text-xs text-gray-300 hover:text-rose-400">🗑</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button onClick={() => setPasteOpen((v) => !v)} className="text-xs text-rose-400 hover:text-rose-500">
+        {pasteOpen ? '收起' : '或者直接粘贴文本 →'}
+      </button>
+      {pasteOpen && (
+        <div className="mt-3 space-y-2">
+          <input
+            value={pasteLabel}
+            onChange={(e) => setPasteLabel(e.target.value)}
+            placeholder="给这份简历起个名字，比如 SDE Resume"
+            className="w-full bg-white border border-pink-100 focus:border-rose-300 rounded-xl px-3 py-2 text-sm outline-none"
+          />
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            rows={5}
+            maxLength={4000}
+            placeholder="粘贴简历文本..."
+            className="w-full bg-white border border-pink-100 focus:border-rose-300 rounded-xl px-3 py-2 text-sm outline-none resize-none"
+          />
+          <button
+            onClick={async () => {
+              if (!pasteLabel.trim() || !pasteText.trim()) return
+              try {
+                await saveResume(pasteLabel.trim(), pasteText.trim())
+                setPasteLabel(''); setPasteText(''); setPasteOpen(false); setError('')
+              } catch (e: unknown) {
+                setError(e instanceof Error ? e.message : '保存失败')
+              }
+            }}
+            className="px-4 py-2 bg-gradient-to-r from-rose-400 to-pink-500 text-white text-sm font-medium rounded-xl"
+          >
+            保存
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function CareerPage() {
   const router = useRouter()
@@ -59,6 +236,8 @@ export default function CareerPage() {
           </h1>
           <p className="text-gray-400 text-sm">SDE / Data Scientist 面试口语，挑一种方式开始</p>
         </div>
+
+        {isSignedIn && <ResumeManager />}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <button

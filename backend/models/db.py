@@ -125,7 +125,23 @@ async def init_db():
                 resume_text     TEXT DEFAULT '',
                 jd_text         TEXT DEFAULT '',
                 track_focus     TEXT DEFAULT 'sde',
+                active_resume_id INTEGER DEFAULT NULL,
                 updated_at      TEXT NOT NULL
+            )
+        """)
+        try:
+            # user_profiles already existed in production before active_resume_id was added —
+            # CREATE TABLE IF NOT EXISTS is a no-op there, so this needs an explicit migration.
+            await db.execute("ALTER TABLE user_profiles ADD COLUMN active_resume_id INTEGER DEFAULT NULL")
+        except Exception:
+            pass
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_resumes (
+                id              SERIAL PRIMARY KEY,
+                clerk_user_id   TEXT NOT NULL,
+                label           TEXT NOT NULL,
+                resume_text     TEXT NOT NULL,
+                created_at      TEXT NOT NULL
             )
         """)
         await db.execute("""

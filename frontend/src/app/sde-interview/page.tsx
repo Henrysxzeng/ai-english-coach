@@ -39,7 +39,6 @@ export default function SdeInterviewPage() {
   const [jdContext, setJdContext] = useState('')
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
   const [isLoading, setIsLoading] = useState(false)
-  const [isUploadingPdf, setIsUploadingPdf] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<QuestionCategory | 'all'>('all')
   const [showQuestions, setShowQuestions] = useState(false)
@@ -62,7 +61,7 @@ export default function SdeInterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn])
 
-  async function saveProfile(resumeOverride?: string, jdOverride?: string) {
+  async function saveJd() {
     if (!isSignedIn) return
     const token = await getToken()
     await fetch(`${API_URL}/api/modules/profile`, {
@@ -71,11 +70,7 @@ export default function SdeInterviewPage() {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({
-        resume_text: resumeOverride ?? resumeContext,
-        jd_text: jdOverride ?? jdContext,
-        track_focus: 'sde',
-      }),
+      body: JSON.stringify({ resume_text: resumeContext, jd_text: jdContext, track_focus: 'sde' }),
     })
   }
 
@@ -144,63 +139,16 @@ export default function SdeInterviewPage() {
             <p className="text-xs text-gray-400">Helps AI personalize interview questions</p>
           </div>
 
-          {/* Resume textarea */}
+          {/* Resume — managed centrally on /career, shown here read-only */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-sm font-medium text-gray-600">Your Resume</label>
-              <label
-                className={`cursor-pointer text-xs px-3 py-1 rounded-lg border transition-all duration-200 ${
-                  isUploadingPdf
-                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'border-rose-200 text-rose-400 hover:bg-rose-50'
-                }`}
-              >
-                {isUploadingPdf ? 'Parsing...' : '📄 Upload PDF'}
-                <input
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
-                  disabled={isUploadingPdf}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    setIsUploadingPdf(true)
-                    setError(null)
-                    try {
-                      const formData = new FormData()
-                      formData.append('file', file)
-                      const resp = await fetch(`${API_URL}/api/parse-resume-pdf`, { method: 'POST', body: formData })
-                      if (!resp.ok) {
-                        const data = await resp.json()
-                        throw new Error(data.detail || 'Failed to parse PDF')
-                      }
-                      const data = await resp.json()
-                      setResumeContext(data.text)
-                      saveProfile(data.text)
-                    } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : 'Failed to parse PDF'
-                      setError(message + '. Try pasting your resume instead.')
-                    } finally {
-                      setIsUploadingPdf(false)
-                      e.target.value = ''
-                    }
-                  }}
-                />
-              </label>
-            </div>
-            <div className="relative">
-              <textarea
-                value={resumeContext}
-                onChange={(e) => setResumeContext(e.target.value)}
-                onBlur={() => saveProfile()}
-                maxLength={2000}
-                rows={4}
-                placeholder="Paste your resume here (optional) — AI will ask relevant project questions..."
-                className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
-              />
-              <span className="absolute bottom-2 right-3 text-xs text-gray-400">
-                {resumeContext.length}/2000
-              </span>
+            <label className="block text-sm font-medium text-gray-600 mb-1.5">Your Resume</label>
+            <div className="bg-white border border-pink-100 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+              <p className="text-sm text-gray-500 truncate">
+                {resumeContext ? resumeContext.slice(0, 80) + (resumeContext.length > 80 ? '…' : '') : '还没有保存的简历'}
+              </p>
+              <Link href="/career" className="text-xs text-rose-400 hover:text-rose-500 whitespace-nowrap">
+                管理简历 →
+              </Link>
             </div>
           </div>
 
@@ -213,7 +161,7 @@ export default function SdeInterviewPage() {
               <textarea
                 value={jdContext}
                 onChange={(e) => setJdContext(e.target.value)}
-                onBlur={() => saveProfile()}
+                onBlur={() => saveJd()}
                 maxLength={2000}
                 rows={4}
                 placeholder="Paste job description (optional) — AI will tailor questions to the role..."

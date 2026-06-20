@@ -44,7 +44,6 @@ export default function ModuleStagePage() {
   const [stageInfos, setStageInfos] = useState<StageInfo[] | null>(null)
   const [selectedStage, setSelectedStage] = useState<string>('')
   const [profile, setProfile] = useState({ resume_text: '', jd_text: '' })
-  const [profileSaving, setProfileSaving] = useState(false)
   const [scriptContent, setScriptContent] = useState<string | Array<{ question: string; suggested_answer: string }> | null>(null)
   const [contentType, setContentType] = useState<string>('')
   const [scriptLoading, setScriptLoading] = useState(false)
@@ -100,20 +99,6 @@ export default function ModuleStagePage() {
 
   const stageInfo = stageInfos?.find((s) => s.stage === selectedStage)
   const isLocked = stageInfo?.status === 'locked'
-
-  async function saveProfile() {
-    setProfileSaving(true)
-    try {
-      const headers = await authHeaders()
-      await fetch(`${API_URL}/api/modules/profile`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resume_text: profile.resume_text, jd_text: profile.jd_text, track_focus: track }),
-      })
-    } finally {
-      setProfileSaving(false)
-    }
-  }
 
   async function submitProblem() {
     if (!problemTitle.trim()) return
@@ -296,20 +281,18 @@ export default function ModuleStagePage() {
           </div>
         ) : (
           <>
-            {/* learn stage: profile input for self_intro / resume_deep_dive */}
+            {/* learn stage: 简历现在统一在 /career 管理，这里只读展示 + 跳转链接 */}
             {selectedStage === 'learn' && NEEDS_PROFILE.has(moduleName) && (
-              <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)] space-y-3">
-                <p className="text-sm font-medium text-gray-700">你的简历（可选，AI 会根据这个生成稿子）</p>
-                <textarea
-                  value={profile.resume_text}
-                  onChange={(e) => setProfile({ ...profile, resume_text: e.target.value })}
-                  onBlur={saveProfile}
-                  rows={5}
-                  maxLength={3000}
-                  placeholder="粘贴你的简历..."
-                  className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
-                />
-                {profileSaving && <p className="text-xs text-gray-400">保存中…</p>}
+              <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)] space-y-2">
+                <p className="text-sm font-medium text-gray-700">你的简历（AI 会根据这个生成稿子）</p>
+                <div className="bg-white border border-pink-100 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                  <p className="text-sm text-gray-500 truncate">
+                    {profile.resume_text ? profile.resume_text.slice(0, 80) + (profile.resume_text.length > 80 ? '…' : '') : '还没有保存的简历'}
+                  </p>
+                  <Link href="/career" className="text-xs text-rose-400 hover:text-rose-500 whitespace-nowrap">
+                    管理简历 →
+                  </Link>
+                </div>
               </div>
             )}
 

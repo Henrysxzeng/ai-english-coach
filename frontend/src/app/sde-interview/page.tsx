@@ -2,9 +2,10 @@
 // owner: Frontend Engineer
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@clerk/nextjs'
 import { SDE_QUESTIONS, CATEGORY_LABELS, type QuestionCategory } from './questions'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -32,6 +33,7 @@ const SUB_SCENES = [
 
 export default function SdeInterviewPage() {
   const router = useRouter()
+  const { isSignedIn, getToken } = useAuth()
   const [selectedScene, setSelectedScene] = useState('')
   const [resumeContext, setResumeContext] = useState('')
   const [jdContext, setJdContext] = useState('')
@@ -42,6 +44,40 @@ export default function SdeInterviewPage() {
   const [selectedCategory, setSelectedCategory] = useState<QuestionCategory | 'all'>('all')
   const [showQuestions, setShowQuestions] = useState(false)
   const [expandedExample, setExpandedExample] = useState<string | null>(null)
+
+  // 简历/JD 跟训练地图共用同一份资料(user_profiles)，登录后自动带出已保存的内容。
+  useEffect(() => {
+    if (!isSignedIn) return
+    ;(async () => {
+      const token = await getToken()
+      const res = await fetch(`${API_URL}/api/modules/profile`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (res.ok) {
+        const p = await res.json()
+        if (p.resume_text) setResumeContext(p.resume_text)
+        if (p.jd_text) setJdContext(p.jd_text)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn])
+
+  async function saveProfile(resumeOverride?: string, jdOverride?: string) {
+    if (!isSignedIn) return
+    const token = await getToken()
+    await fetch(`${API_URL}/api/modules/profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        resume_text: resumeOverride ?? resumeContext,
+        jd_text: jdOverride ?? jdContext,
+        track_focus: 'sde',
+      }),
+    })
+  }
 
   async function handleStart() {
     if (!selectedScene || isLoading) return
@@ -140,6 +176,7 @@ export default function SdeInterviewPage() {
                       }
                       const data = await resp.json()
                       setResumeContext(data.text)
+                      saveProfile(data.text)
                     } catch (err: unknown) {
                       const message = err instanceof Error ? err.message : 'Failed to parse PDF'
                       setError(message + '. Try pasting your resume instead.')
@@ -155,6 +192,7 @@ export default function SdeInterviewPage() {
               <textarea
                 value={resumeContext}
                 onChange={(e) => setResumeContext(e.target.value)}
+                onBlur={() => saveProfile()}
                 maxLength={2000}
                 rows={4}
                 placeholder="Paste your resume here (optional) — AI will ask relevant project questions..."
@@ -175,6 +213,7 @@ export default function SdeInterviewPage() {
               <textarea
                 value={jdContext}
                 onChange={(e) => setJdContext(e.target.value)}
+                onBlur={() => saveProfile()}
                 maxLength={2000}
                 rows={4}
                 placeholder="Paste job description (optional) — AI will tailor questions to the role..."

@@ -183,14 +183,15 @@ export default function ModuleStagePage() {
       if (!sceneRes.ok) { setError('找不到对应的练习场景'); return }
       const { scene } = await sceneRes.json()
 
+      // Resume/JD context follows the candidate through every module in the career
+      // track — not just self_intro/resume_deep_dive — so the AI can ground technical
+      // follow-ups in their real background too.
       let resumeContext = '', jdContext = '', problemContext = ''
-      if (NEEDS_PROFILE.has(moduleName) || moduleName === 'behavioral') {
-        const pRes = await fetch(`${API_URL}/api/modules/profile`, { headers })
-        if (pRes.ok) {
-          const p = await pRes.json()
-          resumeContext = p.resume_text ?? ''
-          jdContext = p.jd_text ?? ''
-        }
+      const pRes = await fetch(`${API_URL}/api/modules/profile`, { headers })
+      if (pRes.ok) {
+        const p = await pRes.json()
+        resumeContext = p.resume_text ?? ''
+        jdContext = p.jd_text ?? ''
       }
       // Only "apply" reuses the candidate's self-selected problem. "master" leaves
       // problem_context empty so the AI invents a fresh problem itself (see SCENE_PROMPTS).

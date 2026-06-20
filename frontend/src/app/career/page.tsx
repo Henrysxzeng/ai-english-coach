@@ -1,9 +1,9 @@
 // file: src/app/career/page.tsx — 求职英语主线着陆页
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { SignInButton, UserButton, useAuth } from '@clerk/nextjs'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -14,8 +14,16 @@ interface ResumeItem {
   created_at: string
 }
 
-function ResumeManager() {
+type ResumeTrack = 'sde' | 'ds' | 'pm'
+const RESUME_TRACKS: { id: ResumeTrack; label: string }[] = [
+  { id: 'sde', label: '💻 SDE' },
+  { id: 'ds', label: '📊 Data Scientist' },
+  { id: 'pm', label: '📋 Product Manager' },
+]
+
+function ResumeManager({ initialTrack }: { initialTrack: ResumeTrack }) {
   const { getToken } = useAuth()
+  const [track, setTrack] = useState<ResumeTrack>(initialTrack)
   const [resumes, setResumes] = useState<ResumeItem[] | null>(null)
   const [activeId, setActiveId] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -31,7 +39,7 @@ function ResumeManager() {
 
   async function load() {
     const headers = await authHeaders()
-    const res = await fetch(`${API_URL}/api/modules/resumes`, { headers })
+    const res = await fetch(`${API_URL}/api/modules/resumes?track=${track}`, { headers })
     if (res.ok) {
       const data = await res.json()
       setResumes(data.resumes)
@@ -40,16 +48,17 @@ function ResumeManager() {
   }
 
   useEffect(() => {
+    setResumes(null)
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [track])
 
   async function saveResume(label: string, resumeText: string) {
     const headers = await authHeaders()
     const res = await fetch(`${API_URL}/api/modules/resumes`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label, resume_text: resumeText }),
+      body: JSON.stringify({ track, label, resume_text: resumeText }),
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -84,7 +93,7 @@ function ResumeManager() {
     await fetch(`${API_URL}/api/modules/resumes/active`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resume_id: id }),
+      body: JSON.stringify({ track, resume_id: id }),
     })
     setActiveId(id)
   }
@@ -98,9 +107,27 @@ function ResumeManager() {
   return (
     <div className="bg-white/22 backdrop-blur-2xl border border-white/40 rounded-2xl p-6 mb-8
       shadow-[0_8px_32px_rgba(236,72,153,0.10),inset_0_1px_0_rgba(255,255,255,0.55)]">
+      <p className="text-sm font-semibold text-gray-700 mb-3">📄 我的简历</p>
+
+      <div className="flex gap-1.5 mb-4">
+        {RESUME_TRACKS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTrack(t.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+              track === t.id
+                ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white'
+                : 'bg-white/40 border border-white/50 text-gray-500 hover:bg-white/60'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-gray-700">📄 我的简历</p>
-        <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg border transition-all duration-200 ${
+        <p className="text-xs text-gray-400">这份简历会用在 {RESUME_TRACKS.find((t) => t.id === track)?.label} 赛道的所有练习里</p>
+        <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg border transition-all duration-200 whitespace-nowrap ${
           uploading ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-rose-200 text-rose-400 hover:bg-rose-50'
         }`}>
           {uploading ? '解析中…' : '+ 上传简历 (PDF/Word)'}
@@ -182,9 +209,11 @@ function ResumeManager() {
   )
 }
 
-export default function CareerPage() {
+function CareerContent() {
   const router = useRouter()
   const { isSignedIn } = useAuth()
+  const searchParams = useSearchParams()
+  const initialTrack = (searchParams.get('track') as ResumeTrack) || 'sde'
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -237,7 +266,7 @@ export default function CareerPage() {
           <p className="text-gray-400 text-sm">SDE / Data Scientist 面试口语，挑一种方式开始</p>
         </div>
 
-        {isSignedIn && <ResumeManager />}
+        {isSignedIn && <ResumeManager initialTrack={initialTrack} />}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <button
@@ -274,5 +303,17 @@ export default function CareerPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function CareerPage() {
+  return (
+    <Suspense fallback={
+      <div className="relative min-h-screen overflow-hidden flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-rose-100 border-t-rose-400 rounded-full animate-spin" />
+      </div>
+    }>
+      <CareerContent />
+    </Suspense>
   )
 }

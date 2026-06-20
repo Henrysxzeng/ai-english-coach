@@ -77,9 +77,13 @@ async def _require_user(request: Request) -> str:
     return clerk_uid
 
 
-def _validate_track_module_stage(track: str, module: str, stage: str | None = None):
+def _validate_track(track: str):
     if track not in TRACKS:
         raise HTTPException(status_code=400, detail=f"Invalid track. Choose: {TRACKS}")
+
+
+def _validate_track_module_stage(track: str, module: str, stage: str | None = None):
+    _validate_track(track)
     if module not in MODULE_ORDER:
         raise HTTPException(status_code=400, detail=f"Invalid module. Choose: {MODULE_ORDER}")
     if stage is not None and stage not in MODULE_STAGES[module]:
@@ -103,7 +107,7 @@ async def _ensure_initialized(db, clerk_uid: str, track: str):
 @router.get("")
 async def get_modules(request: Request, track: str = "sde"):
     clerk_uid = await _require_user(request)
-    _validate_track_module_stage(track, MODULE_ORDER[0])
+    _validate_track(track)
 
     async with aiosqlite.connect(DB_PATH) as db:
         await _ensure_initialized(db, clerk_uid, track)
@@ -148,59 +152,69 @@ async def update_profile(request: Request, data: ModuleProfileUpdate):
     return {"ok": True}
 
 
+async def _get_active_resume_text(db, clerk_uid: str, track: str) -> tuple[str, int | None]:
+    """简历按 track 各自独立：先看这个 track 有没有显式选中的简历，没有就用这个 track 最新上传的那份。"""
+    cursor = await db.execute(
+        "SELECT resume_id FROM user_active_resume WHERE clerk_user_id = ? AND track = ?",
+        (clerk_uid, track),
+    )
+    active_row = await cursor.fetchone()
+    active_resume_id = active_row["resume_id"] if active_row else None
+
+    if active_resume_id is not None:
+        cursor = await db.execute(
+            "SELECT id, resume_text FROM user_resumes WHERE clerk_user_id = ? AND id = ? AND track = ?",
+            (clerk_uid, active_resume_id, track),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT id, resume_text FROM user_resumes WHERE clerk_user_id = ? AND track = ? ORDER BY id DESC LIMIT 1",
+            (clerk_uid, track),
+        )
+    resume_row = await cursor.fetchone()
+    if resume_row:
+        return resume_row["resume_text"], resume_row["id"]
+    return "", None
+
+
 @router.get("/profile")
-async def get_profile(request: Request):
+async def get_profile(request: Request, track: str = "sde"):
     clerk_uid = await _require_user(request)
+    _validate_track(track)
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
-            "SELECT resume_text, jd_text, track_focus, active_resume_id FROM user_profiles WHERE clerk_user_id = ?",
+            "SELECT jd_text, track_focus FROM user_profiles WHERE clerk_user_id = ?",
             (clerk_uid,),
         )
         row = await cursor.fetchone()
+        resume_text, active_resume_id = await _get_active_resume_text(db, clerk_uid, track)
 
-        # 简历从 user_resumes（多份简历）里取当前选中的那份，优先于 user_profiles 里的旧单份字段
-        resume_text = row["resume_text"] if row else ""
-        active_resume_id = row["active_resume_id"] if row else None
-        if active_resume_id is not None:
-            cursor = await db.execute(
-                "SELECT id, resume_text FROM user_resumes WHERE clerk_user_id = ? AND id = ?",
-                (clerk_uid, active_resume_id),
-            )
-        else:
-            cursor = await db.execute(
-                "SELECT id, resume_text FROM user_resumes WHERE clerk_user_id = ? ORDER BY id DESC LIMIT 1",
-                (clerk_uid,),
-            )
-        resume_row = await cursor.fetchone()
-        if resume_row:
-            resume_text = resume_row["resume_text"]
-            active_resume_id = resume_row["id"]
-
-    if not row:
-        return {"resume_text": resume_text, "jd_text": "", "track_focus": "sde", "active_resume_id": active_resume_id}
-    result = dict(row)
-    result["resume_text"] = resume_text
-    result["active_resume_id"] = active_resume_id
-    return result
+    return {
+        "resume_text": resume_text,
+        "active_resume_id": active_resume_id,
+        "jd_text": row["jd_text"] if row else "",
+        "track_focus": row["track_focus"] if row else "sde",
+    }
 
 
 @router.get("/resumes")
-async def list_resumes(request: Request):
+async def list_resumes(request: Request, track: str = "sde"):
     clerk_uid = await _require_user(request)
+    _validate_track(track)
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
-            "SELECT id, label, created_at FROM user_resumes WHERE clerk_user_id = ? ORDER BY id DESC",
-            (clerk_uid,),
+            "SELECT id, label, created_at FROM user_resumes WHERE clerk_user_id = ? AND track = ? ORDER BY id DESC",
+            (clerk_uid, track),
         )
         resumes = [dict(r) for r in await cursor.fetchall()]
         cursor = await db.execute(
-            "SELECT active_resume_id FROM user_profiles WHERE clerk_user_id = ?",
-            (clerk_uid,),
+            "SELECT resume_id FROM user_active_resume WHERE clerk_user_id = ? AND track = ?",
+            (clerk_uid, track),
         )
-        row = await cursor.fetchone()
-    active_id = row["active_resume_id"] if row else None
+        active_row = await cursor.fetchone()
+    active_id = active_row["resume_id"] if active_row else None
     if active_id is None and resumes:
         active_id = resumes[0]["id"]
     return {"resumes": resumes, "active_resume_id": active_id}
@@ -209,22 +223,23 @@ async def list_resumes(request: Request):
 @router.post("/resumes")
 async def create_resume(request: Request, data: UserResumeCreate):
     clerk_uid = await _require_user(request)
+    _validate_track(data.track)
     if not data.label.strip() or not data.resume_text.strip():
         raise HTTPException(status_code=400, detail="label and resume_text are required")
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "INSERT INTO user_resumes (clerk_user_id, label, resume_text, created_at) VALUES (?, ?, ?, ?) RETURNING id",
-            (clerk_uid, data.label.strip(), data.resume_text.strip(), now),
+            "INSERT INTO user_resumes (clerk_user_id, track, label, resume_text, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id",
+            (clerk_uid, data.track, data.label.strip(), data.resume_text.strip(), now),
         )
         row = await cursor.fetchone()
         new_id = row[0] if row else None
-        # 新上传的简历自动设为当前训练使用的简历
+        # 新上传的简历自动设为这个 track 当前训练使用的简历
         await db.execute(
-            """INSERT INTO user_profiles (clerk_user_id, active_resume_id, updated_at)
+            """INSERT INTO user_active_resume (clerk_user_id, track, resume_id)
                VALUES (?, ?, ?)
-               ON CONFLICT (clerk_user_id) DO UPDATE SET active_resume_id = excluded.active_resume_id, updated_at = excluded.updated_at""",
-            (clerk_uid, new_id, now),
+               ON CONFLICT (clerk_user_id, track) DO UPDATE SET resume_id = excluded.resume_id""",
+            (clerk_uid, data.track, new_id),
         )
         await db.commit()
     return {"ok": True, "id": new_id}
@@ -233,19 +248,19 @@ async def create_resume(request: Request, data: UserResumeCreate):
 @router.post("/resumes/active")
 async def set_active_resume(request: Request, data: SetActiveResume):
     clerk_uid = await _require_user(request)
+    _validate_track(data.track)
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "SELECT id FROM user_resumes WHERE id = ? AND clerk_user_id = ?",
-            (data.resume_id, clerk_uid),
+            "SELECT id FROM user_resumes WHERE id = ? AND clerk_user_id = ? AND track = ?",
+            (data.resume_id, clerk_uid, data.track),
         )
         if not await cursor.fetchone():
             raise HTTPException(status_code=404, detail="Resume not found")
-        now = datetime.now(timezone.utc).isoformat()
         await db.execute(
-            """INSERT INTO user_profiles (clerk_user_id, active_resume_id, updated_at)
+            """INSERT INTO user_active_resume (clerk_user_id, track, resume_id)
                VALUES (?, ?, ?)
-               ON CONFLICT (clerk_user_id) DO UPDATE SET active_resume_id = excluded.active_resume_id, updated_at = excluded.updated_at""",
-            (clerk_uid, data.resume_id, now),
+               ON CONFLICT (clerk_user_id, track) DO UPDATE SET resume_id = excluded.resume_id""",
+            (clerk_uid, data.track, data.resume_id),
         )
         await db.commit()
     return {"ok": True}
@@ -263,7 +278,7 @@ async def delete_resume(resume_id: int, request: Request):
         if not deleted:
             raise HTTPException(status_code=404, detail="Resume not found")
         await db.execute(
-            "UPDATE user_profiles SET active_resume_id = NULL WHERE clerk_user_id = ? AND active_resume_id = ?",
+            "DELETE FROM user_active_resume WHERE clerk_user_id = ? AND resume_id = ?",
             (clerk_uid, resume_id),
         )
         await db.commit()
@@ -332,12 +347,7 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
             if cached:
                 return _format_script_response(data.module, cached["content"])
 
-        cursor = await db.execute(
-            "SELECT resume_text FROM user_profiles WHERE clerk_user_id = ?",
-            (clerk_uid,),
-        )
-        profile = await cursor.fetchone()
-        resume_text = profile["resume_text"] if profile else ""
+        resume_text, _ = await _get_active_resume_text(db, clerk_uid, data.track)
 
     if data.module == "behavioral" and data.track in ("sde", "ds"):
         # sde/ds 复用前端现成的题库(questions.ts)，不调用 LLM

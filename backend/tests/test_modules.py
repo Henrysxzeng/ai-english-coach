@@ -257,6 +257,36 @@ def test_pm_track_scene_mapping():
     _run(_())
 
 
+def test_resumes_are_isolated_per_track():
+    async def _():
+        with patch("routers.modules.get_clerk_user_id", new=AsyncMock(return_value="test_clerk_user_resume_isolation")):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                headers = {"Authorization": "Bearer x"}
+
+                sde_resume = await c.post("/api/modules/resumes", json={"track": "sde", "label": "SDE", "resume_text": "SDE resume text"}, headers=headers)
+                ds_resume = await c.post("/api/modules/resumes", json={"track": "ds", "label": "DS", "resume_text": "DS resume text"}, headers=headers)
+                assert sde_resume.status_code == 200
+                assert ds_resume.status_code == 200
+
+                # each track only lists its own resume
+                sde_list = await c.get("/api/modules/resumes", params={"track": "sde"}, headers=headers)
+                ds_list = await c.get("/api/modules/resumes", params={"track": "ds"}, headers=headers)
+                pm_list = await c.get("/api/modules/resumes", params={"track": "pm"}, headers=headers)
+                assert len(sde_list.json()["resumes"]) == 1
+                assert sde_list.json()["resumes"][0]["label"] == "SDE"
+                assert len(ds_list.json()["resumes"]) == 1
+                assert ds_list.json()["resumes"][0]["label"] == "DS"
+                assert pm_list.json()["resumes"] == []
+
+                # profile resolves the right resume per track, independently
+                sde_profile = await c.get("/api/modules/profile", params={"track": "sde"}, headers=headers)
+                ds_profile = await c.get("/api/modules/profile", params={"track": "ds"}, headers=headers)
+                assert sde_profile.json()["resume_text"] == "SDE resume text"
+                assert ds_profile.json()["resume_text"] == "DS resume text"
+        return sde_resume
+    _run(_())
+
+
 def test_pm_behavioral_generates_corpus_not_static_marker():
     async def _():
         with _auth_patch(), patch(

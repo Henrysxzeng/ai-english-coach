@@ -79,7 +79,7 @@ export default function ModuleStagePage() {
     loadProgress()
     if (NEEDS_PROFILE.has(moduleName)) {
       authHeaders().then((headers) =>
-        fetch(`${API_URL}/api/modules/profile`, { headers }).then((r) => r.ok && r.json()).then((d) => d && setProfile(d))
+        fetch(`${API_URL}/api/modules/profile?track=${track}`, { headers }).then((r) => r.ok && r.json()).then((d) => d && setProfile(d))
       )
     }
     if (PROBLEM_BACKED.has(moduleName)) {
@@ -172,7 +172,7 @@ export default function ModuleStagePage() {
       // track — not just self_intro/resume_deep_dive — so the AI can ground technical
       // follow-ups in their real background too.
       let resumeContext = '', jdContext = '', problemContext = ''
-      const pRes = await fetch(`${API_URL}/api/modules/profile`, { headers })
+      const pRes = await fetch(`${API_URL}/api/modules/profile?track=${track}`, { headers })
       if (pRes.ok) {
         const p = await pRes.json()
         resumeContext = p.resume_text ?? ''
@@ -289,7 +289,7 @@ export default function ModuleStagePage() {
                   <p className="text-sm text-gray-500 truncate">
                     {profile.resume_text ? profile.resume_text.slice(0, 80) + (profile.resume_text.length > 80 ? '…' : '') : '还没有保存的简历'}
                   </p>
-                  <Link href="/career" className="text-xs text-rose-400 hover:text-rose-500 whitespace-nowrap">
+                  <Link href={`/career?track=${track}`} className="text-xs text-rose-400 hover:text-rose-500 whitespace-nowrap">
                     管理简历 →
                   </Link>
                 </div>

@@ -49,7 +49,7 @@ export default function SdeInterviewPage() {
     if (!isSignedIn) return
     ;(async () => {
       const token = await getToken()
-      const res = await fetch(`${API_URL}/api/modules/profile`, {
+      const res = await fetch(`${API_URL}/api/modules/profile?track=sde`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (res.ok) {
@@ -146,7 +146,7 @@ export default function SdeInterviewPage() {
               <p className="text-sm text-gray-500 truncate">
                 {resumeContext ? resumeContext.slice(0, 80) + (resumeContext.length > 80 ? '…' : '') : '还没有保存的简历'}
               </p>
-              <Link href="/career" className="text-xs text-rose-400 hover:text-rose-500 whitespace-nowrap">
+              <Link href="/career?track=sde" className="text-xs text-rose-400 hover:text-rose-500 whitespace-nowrap">
                 管理简历 →
               </Link>
             </div>

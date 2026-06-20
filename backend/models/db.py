@@ -139,9 +139,23 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS user_resumes (
                 id              SERIAL PRIMARY KEY,
                 clerk_user_id   TEXT NOT NULL,
+                track           TEXT NOT NULL DEFAULT 'sde',
                 label           TEXT NOT NULL,
                 resume_text     TEXT NOT NULL,
                 created_at      TEXT NOT NULL
+            )
+        """)
+        try:
+            # user_resumes already existed in production before `track` was added.
+            await db.execute("ALTER TABLE user_resumes ADD COLUMN track TEXT NOT NULL DEFAULT 'sde'")
+        except Exception:
+            pass
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_active_resume (
+                clerk_user_id   TEXT NOT NULL,
+                track           TEXT NOT NULL,
+                resume_id       INTEGER NOT NULL,
+                PRIMARY KEY (clerk_user_id, track)
             )
         """)
         await db.execute("""

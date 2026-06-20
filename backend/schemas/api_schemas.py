@@ -49,11 +49,13 @@ class ModuleAdvanceRequest(BaseModel):
 
 
 class UserResumeCreate(BaseModel):
+    track: str = "sde"
     label: str
     resume_text: str
 
 
 class SetActiveResume(BaseModel):
+    track: str = "sde"
     resume_id: int
 
 

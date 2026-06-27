@@ -22,9 +22,10 @@ async def synthesize(text: str, voice: str = DEFAULT_VOICE) -> bytes:
         return b""
     if voice not in ALLOWED_VOICES:
         voice = DEFAULT_VOICE
+    clean = " ".join(text.split())  # collapse all whitespace/newlines into single spaces
     ssml = (
         "<speak version='1.0' xml:lang='en-US'>"
-        f"<voice name='{voice}'>{escape(text)}</voice></speak>"
+        f"<voice name='{voice}'>{escape(clean)}</voice></speak>"
     )
     headers = {
         "Ocp-Apim-Subscription-Key": AZURE_KEY,

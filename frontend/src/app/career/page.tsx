@@ -12,6 +12,7 @@ interface ResumeItem {
   id: number
   label: string
   created_at: string
+  preview?: string
 }
 
 type ResumeTrack = 'sde' | 'ds' | 'pm' | 'proj'
@@ -29,6 +30,7 @@ function ResumeManager({ initialTrack }: { initialTrack: ResumeTrack }) {
   const [activeId, setActiveId] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  const [previewId, setPreviewId] = useState<number | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteLabel, setPasteLabel] = useState('')
   const [pasteText, setPasteText] = useState('')
@@ -155,17 +157,40 @@ function ResumeManager({ initialTrack }: { initialTrack: ResumeTrack }) {
       {resumes && resumes.length > 0 && (
         <div className="space-y-1.5 mb-2">
           {resumes.map((r) => (
-            <div key={r.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-              activeId === r.id ? 'bg-rose-50/80 border-rose-200' : 'bg-white/30 border-white/50'
-            }`}>
-              <button onClick={() => setActive(r.id)} className="flex items-center gap-2 flex-1 text-left">
-                <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-                  activeId === r.id ? 'border-rose-400 bg-rose-400' : 'border-gray-300'
-                }`} />
-                <span className="text-sm text-gray-700">{r.label}</span>
-                {activeId === r.id && <span className="text-xs text-rose-500">本次训练使用</span>}
-              </button>
-              <button onClick={() => deleteResume(r.id)} className="text-xs text-gray-300 hover:text-rose-400">🗑</button>
+            <div key={r.id}>
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                activeId === r.id ? 'bg-rose-50/80 border-rose-200' : 'bg-white/30 border-white/50'
+              }`}>
+                <button onClick={() => setActive(r.id)} className="flex items-center gap-2 flex-1 text-left">
+                  <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                    activeId === r.id ? 'border-rose-400 bg-rose-400' : 'border-gray-300'
+                  }`} />
+                  <span className="text-sm text-gray-700">{r.label}</span>
+                  {activeId === r.id && <span className="text-xs text-rose-500">本次训练使用</span>}
+                </button>
+                <button
+                  onClick={() => setPreviewId(previewId === r.id ? null : r.id)}
+                  className="text-xs text-gray-400 hover:text-rose-400 px-1"
+                  title="查看解析出的文本"
+                >
+                  {previewId === r.id ? '收起' : '查看文本'}
+                </button>
+                <button onClick={() => deleteResume(r.id)} className="text-xs text-gray-300 hover:text-rose-400">🗑</button>
+              </div>
+              {previewId === r.id && (
+                <div className="mt-1 mx-1 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  {r.preview ? (
+                    <>
+                      <p className="text-xs text-gray-500 whitespace-pre-wrap font-mono leading-relaxed">{r.preview}</p>
+                      {(r.preview.length ?? 0) >= 300 && (
+                        <p className="text-xs text-gray-400 mt-1">（显示前300字符）</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-rose-500">⚠️ 文本为空 — PDF 可能解析失败，建议直接粘贴文本</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

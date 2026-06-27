@@ -214,10 +214,14 @@ async def list_resumes(request: Request, track: str = "sde"):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
-            "SELECT id, label, created_at FROM user_resumes WHERE clerk_user_id = ? AND track = ? ORDER BY id DESC",
+            "SELECT id, label, resume_text, created_at FROM user_resumes WHERE clerk_user_id = ? AND track = ? ORDER BY id DESC",
             (clerk_uid, track),
         )
-        resumes = [dict(r) for r in await cursor.fetchall()]
+        resumes = [
+            {"id": r["id"], "label": r["label"], "created_at": r["created_at"],
+             "preview": (r["resume_text"] or "")[:300]}
+            for r in await cursor.fetchall()
+        ]
         cursor = await db.execute(
             "SELECT resume_id FROM user_active_resume WHERE clerk_user_id = ? AND track = ?",
             (clerk_uid, track),

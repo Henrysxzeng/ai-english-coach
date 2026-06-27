@@ -33,6 +33,7 @@ class ModuleScriptRequest(BaseModel):
     track: str
     module: str
     regenerate: bool = False
+    user_notes: str = ""  # optional user customization hint passed to LLM
 
 
 class ModuleProblemCreate(BaseModel):

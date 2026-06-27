@@ -14,11 +14,12 @@ interface ResumeItem {
   created_at: string
 }
 
-type ResumeTrack = 'sde' | 'ds' | 'pm'
+type ResumeTrack = 'sde' | 'ds' | 'pm' | 'proj'
 const RESUME_TRACKS: { id: ResumeTrack; label: string }[] = [
   { id: 'sde', label: '💻 SDE' },
   { id: 'ds', label: '📊 Data Scientist' },
   { id: 'pm', label: '📋 Product Manager' },
+  { id: 'proj', label: '🗂️ Project Manager' },
 ]
 
 function ResumeManager({ initialTrack }: { initialTrack: ResumeTrack }) {
@@ -263,7 +264,7 @@ function CareerContent() {
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-rose-500 to-pink-500 bg-clip-text text-transparent mb-2">
             北美求职英语
           </h1>
-          <p className="text-gray-400 text-sm">SDE / Data Scientist 面试口语，挑一种方式开始</p>
+          <p className="text-gray-400 text-sm">SDE / DS / PM / Project Manager 面试口语，挑一种方式开始</p>
         </div>
 
         {isSignedIn && <ResumeManager initialTrack={initialTrack} />}

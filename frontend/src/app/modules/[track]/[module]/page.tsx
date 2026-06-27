@@ -233,6 +233,7 @@ export default function ModuleStagePage() {
   const [editContent, setEditContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [startingRecall, setStartingRecall] = useState(false)
+  const [userNotes, setUserNotes] = useState('')
   const [error, setError] = useState('')
 
   async function authHeaders(): Promise<Record<string, string>> {
@@ -317,7 +318,7 @@ export default function ModuleStagePage() {
       const res = await fetch(`${API_URL}/api/modules/script`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ track, module: moduleName, regenerate }),
+        body: JSON.stringify({ track, module: moduleName, regenerate, user_notes: userNotes }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -620,14 +621,26 @@ export default function ModuleStagePage() {
                 ) : needsProblemFirst ? (
                   <p className="text-sm text-gray-400 text-center">先提交一道题目，再生成讲解稿</p>
                 ) : !scriptContent ? (
-                  <div className="text-center">
-                    <button
-                      onClick={() => generateScript(false)}
-                      disabled={scriptLoading}
-                      className="px-6 py-2.5 bg-gradient-to-r from-rose-400 to-pink-500 text-white font-semibold rounded-xl shadow-[0_4px_16px_rgba(244,63,94,0.28)] disabled:opacity-60"
-                    >
-                      {scriptLoading ? '生成中…' : '✨ 生成稿子'}
-                    </button>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1.5 block">给 AI 一点提示（可选）</label>
+                      <textarea
+                        value={userNotes}
+                        onChange={(e) => setUserNotes(e.target.value)}
+                        rows={2}
+                        placeholder="比如：重点突出我的实习经历，少提学校项目 / 我要投 Capgemini，强调咨询和客户沟通能力..."
+                        className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-3 py-2 text-sm text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
+                      />
+                    </div>
+                    <div className="text-center">
+                      <button
+                        onClick={() => generateScript(false)}
+                        disabled={scriptLoading}
+                        className="px-6 py-2.5 bg-gradient-to-r from-rose-400 to-pink-500 text-white font-semibold rounded-xl shadow-[0_4px_16px_rgba(244,63,94,0.28)] disabled:opacity-60"
+                      >
+                        {scriptLoading ? '生成中…' : '✨ 生成稿子'}
+                      </button>
+                    </div>
                   </div>
                 ) : contentType === 'self_intro_dual' ? (
                   <div className="space-y-4">
@@ -657,14 +670,23 @@ export default function ModuleStagePage() {
                       apiUrl={API_URL}
                       getToken={getToken}
                     />
-                    <div className="flex items-center gap-4 pt-1">
-                      <button
-                        onClick={() => { setEditContent((scriptContent as SelfIntroDual)[activeIntroVersion]); setEditMode(true) }}
-                        className="text-xs text-rose-400 hover:text-rose-500"
-                      >
-                        ✏️ 编辑稿子
-                      </button>
-                      <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成两份</button>
+                    <div className="space-y-2 pt-1">
+                      <textarea
+                        value={userNotes}
+                        onChange={(e) => setUserNotes(e.target.value)}
+                        rows={1}
+                        placeholder="给AI的提示（可选）：比如 重点强调我的实习经历…"
+                        className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-3 py-1.5 text-xs text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
+                      />
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => { setEditContent((scriptContent as SelfIntroDual)[activeIntroVersion]); setEditMode(true) }}
+                          className="text-xs text-rose-400 hover:text-rose-500"
+                        >
+                          ✏️ 编辑稿子
+                        </button>
+                        <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成两份</button>
+                      </div>
                     </div>
                     <div className="border-t border-pink-100 pt-3">
                       <button
@@ -684,7 +706,16 @@ export default function ModuleStagePage() {
                         <p className="text-sm text-gray-500">A: {qa.suggested_answer}</p>
                       </div>
                     ))}
-                    <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成</button>
+                    <div className="space-y-2">
+                      <textarea
+                        value={userNotes}
+                        onChange={(e) => setUserNotes(e.target.value)}
+                        rows={1}
+                        placeholder="给AI的提示（可选）：比如 重点突出我的实习经历…"
+                        className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-3 py-1.5 text-xs text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
+                      />
+                      <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成</button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -698,16 +729,25 @@ export default function ModuleStagePage() {
                     ) : (
                       <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{scriptContent as string}</p>
                     )}
-                    <div className="flex items-center gap-4">
-                      {moduleName === 'self_intro' && (
-                        <button
-                          onClick={() => { setEditContent(scriptContent as string); setEditMode(true) }}
-                          className="text-xs text-rose-400 hover:text-rose-500"
-                        >
-                          ✏️ 编辑稿子
-                        </button>
-                      )}
-                      <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成</button>
+                    <div className="space-y-2">
+                      <textarea
+                        value={userNotes}
+                        onChange={(e) => setUserNotes(e.target.value)}
+                        rows={1}
+                        placeholder="给AI的提示（可选）：比如 重点突出我的实习经历…"
+                        className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-3 py-1.5 text-xs text-gray-700 placeholder-gray-300 resize-none transition-all outline-none"
+                      />
+                      <div className="flex items-center gap-4">
+                        {moduleName === 'self_intro' && (
+                          <button
+                            onClick={() => { setEditContent(scriptContent as string); setEditMode(true) }}
+                            className="text-xs text-rose-400 hover:text-rose-500"
+                          >
+                            ✏️ 编辑稿子
+                          </button>
+                        )}
+                        <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成</button>
+                      </div>
                     </div>
                     {moduleName === 'self_intro' && (
                       <div className="border-t border-pink-100 pt-3">

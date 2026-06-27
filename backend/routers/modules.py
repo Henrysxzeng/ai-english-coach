@@ -376,6 +376,8 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
 
         resume_text, _ = await _get_active_resume_text(db, clerk_uid, data.track)
 
+    user_notes = getattr(data, "user_notes", "") or ""
+
     if data.module == "behavioral" and data.track in ("sde", "ds"):
         # sde/ds 复用前端现成的题库(questions.ts)，不调用 LLM
         return {"module": data.module, "content_type": "static_question_bank", "content": None}
@@ -385,10 +387,10 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
         corpus = await generate_behavioral_corpus(data.track)
         content_str = json.dumps(corpus, ensure_ascii=False)
     elif data.module == "self_intro":
-        scripts = await generate_self_intro_script(resume_text, data.track)
+        scripts = await generate_self_intro_script(resume_text, data.track, user_notes)
         content_str = json.dumps(scripts, ensure_ascii=False)
     elif data.module == "resume_deep_dive":
-        corpus = await generate_resume_corpus(resume_text, data.track)
+        corpus = await generate_resume_corpus(resume_text, data.track, user_notes)
         content_str = json.dumps(corpus, ensure_ascii=False)
     elif data.module in PROBLEM_BACKED_MODULES:
         async with aiosqlite.connect(DB_PATH) as db:
@@ -403,7 +405,7 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
         if not problem:
             raise HTTPException(status_code=400, detail="Submit a problem first via POST /api/modules/problem")
         problem_text = f"{problem['title']}\n{problem['description']}".strip()
-        content_str = await generate_explanation_script(data.track, data.module, problem_text)
+        content_str = await generate_explanation_script(data.track, data.module, problem_text, user_notes)
     else:
         raise HTTPException(status_code=400, detail="Unsupported module")
 

@@ -857,10 +857,11 @@ async def generate_interview_feedback(
 ROLE_LABEL = {"sde": "software engineer", "ds": "data scientist", "pm": "product manager", "proj": "project manager"}
 
 
-async def generate_self_intro_script(resume_text: str = "", track: str = "sde") -> dict[str, str]:
+async def generate_self_intro_script(resume_text: str = "", track: str = "sde", user_notes: str = "") -> dict[str, str]:
     """生成技术轮（1分钟）和 HR 轮（3-5分钟）两版自我介绍稿，并行生成。"""
     role = ROLE_LABEL.get(track, "software engineer")
     resume_note = f"Base it on this resume:\n{resume_text}" if resume_text else "No resume provided — write a solid generic template the candidate can personalize."
+    user_note_suffix = f"\nAdditional user instructions (prioritize these): {user_notes}" if user_notes.strip() else ""
 
     tech_prompt = (
         f"Write a 1-minute spoken self-introduction (~130-150 words) for a {role} candidate "
@@ -872,7 +873,7 @@ async def generate_self_intro_script(resume_text: str = "", track: str = "sde") 
         "close with one sentence on why you're interested in this type of role. "
         "Keep it tight and high-level — the interviewer just needs quick context before diving into technical questions. "
         "Natural spoken English, contractions OK, no bullet points or headers. "
-        f"{resume_note} Output ONLY the script, no extra commentary."
+        f"{resume_note}{user_note_suffix} Output ONLY the script, no extra commentary."
     )
 
     hr_prompt = (
@@ -885,7 +886,7 @@ async def generate_self_intro_script(resume_text: str = "", track: str = "sde") 
         "show genuine motivation: why this type of company or role, not a generic line; "
         "close with a forward-looking statement — what you hope to contribute or learn. "
         "Natural spoken English, flowing paragraphs, no bullet points or headers. "
-        f"{resume_note} Output ONLY the script, no extra commentary."
+        f"{resume_note}{user_note_suffix} Output ONLY the script, no extra commentary."
     )
 
     tech_fallback = (
@@ -926,14 +927,16 @@ async def generate_self_intro_script(resume_text: str = "", track: str = "sde") 
         return {"tech": tech_fallback, "hr": hr_fallback}
 
 
-async def generate_resume_corpus(resume_text: str = "", track: str = "sde") -> list[dict]:
+async def generate_resume_corpus(resume_text: str = "", track: str = "sde", user_notes: str = "") -> list[dict]:
     """生成简历深挖语料库（简历深挖模块 learn 阶段用）：常见追问 + 建议答法。"""
     role = ROLE_LABEL.get(track, "software engineer")
+    user_note_suffix = f"\nAdditional user instructions (prioritize these): {user_notes}" if user_notes.strip() else ""
     prompt = (
         f"You are prepping a {role} candidate for a resume/project deep-dive interview.\n"
         f"Resume: {resume_text or '(no resume provided — use generic but realistic example projects)'}\n\n"
         "Generate 5-6 likely deep-dive questions an interviewer would ask about this resume's projects, "
         "each with a suggested model answer (2-3 sentences, specific, quantified where possible). "
+        f"{user_note_suffix}"
         'Reply ONLY with JSON: [{"question": str, "suggested_answer": str}, ...]'
     )
     try:
@@ -989,7 +992,7 @@ async def generate_behavioral_corpus(track: str = "pm") -> list[dict]:
         }]
 
 
-async def generate_explanation_script(track: str, module: str, problem_text: str) -> str:
+async def generate_explanation_script(track: str, module: str, problem_text: str, user_notes: str = "") -> str:
     """生成技术模块(technical_explain/system_design/debug) learn 阶段的口头讲解示范稿。"""
     role = ROLE_LABEL.get(track, "software engineer")
     topic_label = {
@@ -1009,6 +1012,7 @@ async def generate_explanation_script(track: str, module: str, problem_text: str
             "debug": "an estimation or feature-prioritization case",
         },
     }.get(track, {}).get(module, "a technical problem")
+    user_note_suffix = f"\nAdditional user instructions (prioritize these): {user_notes}" if user_notes.strip() else ""
     prompt = (
         f"You are coaching a {role} candidate on how to TALK THROUGH {topic_label} out loud in an interview.\n"
         f"Problem: {problem_text}\n\n"
@@ -1017,8 +1021,8 @@ async def generate_explanation_script(track: str, module: str, problem_text: str
         "- states assumptions or asks clarifying questions\n"
         "- explains the approach step by step\n"
         "- ends with complexity/trade-offs or how they'd validate the result\n"
-        "Sound like natural spoken English (contractions, thinking-out-loud phrasing like 'so my first "
-        "thought is...'), not a written essay. Output ONLY the script text."
+        f"Sound like natural spoken English (contractions, thinking-out-loud phrasing like 'so my first "
+        f"thought is...'), not a written essay.{user_note_suffix} Output ONLY the script text."
     )
     try:
         response = await client.chat.completions.create(

@@ -53,6 +53,10 @@ export default function ModuleStagePage() {
   const [problemSaving, setProblemSaving] = useState(false)
   const [hasProblem, setHasProblem] = useState(false)
   const [startingPractice, setStartingPractice] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [startingRecall, setStartingRecall] = useState(false)
   const [error, setError] = useState('')
 
   async function authHeaders(): Promise<Record<string, string>> {
@@ -95,6 +99,7 @@ export default function ModuleStagePage() {
   useEffect(() => {
     setScriptContent(null)
     setContentType('')
+    setEditMode(false)
   }, [selectedStage])
 
   const stageInfo = stageInfos?.find((s) => s.stage === selectedStage)
@@ -198,6 +203,54 @@ export default function ModuleStagePage() {
       router.push(`/practice/${scene}?session_id=${data.session_id}&track=${track}&module=${moduleName}&stage=${selectedStage}`)
     } finally {
       setStartingPractice(false)
+    }
+  }
+
+  async function saveScript() {
+    if (!editContent.trim()) return
+    setSaving(true)
+    setError('')
+    try {
+      const headers = await authHeaders()
+      const res = await fetch(`${API_URL}/api/modules/script`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ track, module: moduleName, content: editContent }),
+      })
+      if (res.ok) {
+        setScriptContent(editContent)
+        setEditMode(false)
+      } else {
+        setError('保存失败，请重试')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function startRecall() {
+    if (!scriptContent || typeof scriptContent !== 'string') return
+    setStartingRecall(true)
+    setError('')
+    try {
+      const headers = await authHeaders()
+      let resumeContext = '', jdContext = ''
+      const pRes = await fetch(`${API_URL}/api/modules/profile?track=${track}`, { headers })
+      if (pRes.ok) {
+        const p = await pRes.json()
+        resumeContext = p.resume_text ?? ''
+        jdContext = p.jd_text ?? ''
+      }
+      const res = await fetch(`${API_URL}/api/session/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scene: 'self_intro_recall', resume_context: resumeContext, jd_context: jdContext, problem_context: scriptContent }),
+      })
+      if (!res.ok) { setError('创建练习会话失败'); return }
+      const data = await res.json()
+      router.push(`/practice/self_intro_recall?session_id=${data.session_id}&track=${track}&module=${moduleName}&stage=learn`)
+    } finally {
+      setStartingRecall(false)
     }
   }
 
@@ -328,7 +381,32 @@ export default function ModuleStagePage() {
             {/* learn stage content */}
             {selectedStage === 'learn' && (
               <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)] space-y-4">
-                {moduleName === 'behavioral' && (track === 'sde' || track === 'ds') ? (
+                {editMode ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-gray-400">自由编辑稿子内容，保存后会替换 AI 生成版本</p>
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={12}
+                      className="w-full bg-white border border-pink-100 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 rounded-xl px-4 py-3 text-sm text-gray-700 resize-y transition-all outline-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={saveScript}
+                        disabled={saving || !editContent.trim()}
+                        className="px-5 py-2 bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+                      >
+                        {saving ? '保存中…' : '保存'}
+                      </button>
+                      <button
+                        onClick={() => setEditMode(false)}
+                        className="px-5 py-2 bg-white border border-pink-100 text-gray-500 hover:border-rose-200 rounded-xl text-sm font-medium"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : moduleName === 'behavioral' && (track === 'sde' || track === 'ds') ? (
                   <div className="text-center space-y-3">
                     <p className="text-sm text-gray-500">行为面试用现成的题库 + STAR 范例答案来背</p>
                     <Link href="/sde-interview" className="inline-block px-5 py-2 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-xl text-sm font-medium">
@@ -360,11 +438,32 @@ export default function ModuleStagePage() {
                 ) : (
                   <div className="space-y-3">
                     <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{scriptContent as string}</p>
-                    <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成</button>
+                    <div className="flex items-center gap-4">
+                      {moduleName === 'self_intro' && (
+                        <button
+                          onClick={() => { setEditContent(scriptContent as string); setEditMode(true) }}
+                          className="text-xs text-rose-400 hover:text-rose-500"
+                        >
+                          ✏️ 编辑稿子
+                        </button>
+                      )}
+                      <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成</button>
+                    </div>
+                    {moduleName === 'self_intro' && (
+                      <div className="border-t border-pink-100 pt-3">
+                        <button
+                          onClick={startRecall}
+                          disabled={startingRecall}
+                          className="w-full px-5 py-2.5 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-xl text-sm font-medium disabled:opacity-50"
+                        >
+                          {startingRecall ? '准备中…' : '🙈 盲背练习 — 遮住稿子，AI帮你对照评分'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {(scriptContent || moduleName === 'behavioral') && stageInfo?.status !== 'completed' && (
+                {(scriptContent || moduleName === 'behavioral') && stageInfo?.status !== 'completed' && !editMode && (
                   <div className="text-center pt-2">
                     <button
                       onClick={markComplete}

@@ -11,6 +11,7 @@ from utils.auth import get_clerk_user_id
 from schemas.api_schemas import (
     ModuleProfileUpdate,
     ModuleScriptRequest,
+    ModuleScriptSave,
     ModuleProblemCreate,
     ModuleAdvanceRequest,
     UserResumeCreate,
@@ -399,6 +400,27 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
         await db.commit()
 
     return _format_script_response(data.module, content_str)
+
+
+@router.put("/script")
+async def save_edited_script(request: Request, data: ModuleScriptSave):
+    clerk_uid = await _require_user(request)
+    _validate_track_module_stage(data.track, data.module)
+    if data.module != "self_intro":
+        raise HTTPException(status_code=400, detail="Only self_intro scripts can be manually edited")
+    if not data.content.strip():
+        raise HTTPException(status_code=400, detail="content cannot be empty")
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """INSERT INTO study_materials (clerk_user_id, track, module, content, created_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT (clerk_user_id, track, module) DO UPDATE SET
+                   content = excluded.content, created_at = excluded.created_at""",
+            (clerk_uid, data.track, data.module, data.content.strip(), now),
+        )
+        await db.commit()
+    return {"ok": True}
 
 
 def _format_script_response(module: str, content_str: str):

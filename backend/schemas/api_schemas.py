@@ -59,6 +59,12 @@ class SetActiveResume(BaseModel):
     resume_id: int
 
 
+class ModuleScriptSave(BaseModel):
+    track: str
+    module: str
+    content: str
+
+
 class MessageResponse(BaseModel):
     role: str
     content: str

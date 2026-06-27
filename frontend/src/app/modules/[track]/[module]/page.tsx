@@ -3,7 +3,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { SignInButton, useAuth } from '@clerk/nextjs'
 
@@ -105,6 +105,7 @@ const MODULE_META: Record<string, { icon: string; title: Record<string, string> 
 export default function ModuleStagePage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { getToken, isSignedIn, isLoaded } = useAuth()
   const track = params.track as string
   const moduleName = params.module as string
@@ -115,7 +116,8 @@ export default function ModuleStagePage() {
   const [selectedStage, setSelectedStage] = useState<string>('')
   const [profile, setProfile] = useState({ resume_text: '', jd_text: '' })
   const [scriptContent, setScriptContent] = useState<string | Array<{ question: string; suggested_answer: string }> | SelfIntroDual | null>(null)
-  const [activeIntroVersion, setActiveIntroVersion] = useState<'tech' | 'hr'>('tech')
+  const versionParam = searchParams.get('version')
+  const [activeIntroVersion, setActiveIntroVersion] = useState<'tech' | 'hr'>(versionParam === 'hr' ? 'hr' : 'tech')
   const [contentType, setContentType] = useState<string>('')
   const [scriptLoading, setScriptLoading] = useState(false)
   const [advancing, setAdvancing] = useState(false)
@@ -428,8 +430,8 @@ export default function ModuleStagePage() {
           </div>
         ) : (
           <>
-            {/* learn stage: 简历现在统一在 /career 管理，这里只读展示 + 跳转链接 */}
-            {selectedStage === 'learn' && NEEDS_PROFILE.has(moduleName) && (
+            {/* resume display: only for resume_deep_dive, not self_intro (script generation uses it silently) */}
+            {selectedStage === 'learn' && NEEDS_PROFILE.has(moduleName) && moduleName !== 'self_intro' && (
               <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)] space-y-2">
                 <p className="text-sm font-medium text-gray-700">你的简历（AI 会根据这个生成稿子）</p>
                 <div className="bg-white border border-pink-100 rounded-xl px-4 py-3 flex items-center justify-between gap-3">

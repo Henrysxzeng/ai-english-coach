@@ -184,16 +184,52 @@ export default function ModulesPage() {
               const meta = MODULE_META[m.module]
               const allLocked = m.stages.every((s) => s.status === 'locked')
               const allCompleted = m.stages.every((s) => s.status === 'completed')
+              const cardBase = `w-full text-left rounded-2xl p-5 transition-all duration-200 ${
+                allLocked
+                  ? 'bg-white/40 border border-white/50 opacity-50 cursor-not-allowed'
+                  : 'bg-white/80 backdrop-blur-xl border border-pink-100 shadow-[0_4px_24px_rgba(244,114,182,0.07)] hover:shadow-[0_8px_32px_rgba(244,114,182,0.12)] hover:-translate-y-0.5'
+              }`
+
+              if (m.module === 'self_intro') {
+                return (
+                  <div key={m.module} className={cardBase}>
+                    <div className="flex items-start gap-4">
+                      <div className="text-3xl shrink-0">{meta?.icon ?? '🙋'}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs text-gray-300 font-mono">{i + 1}</span>
+                          <h3 className="font-semibold text-gray-800">{meta?.title[track] ?? '自我介绍'}</h3>
+                          {allCompleted && <span className="text-green-500 text-sm">✓ 完成</span>}
+                        </div>
+                        <p className="text-xs text-gray-400 mb-3">生成两版稿子，分别背诵练习</p>
+                        {!allLocked && (
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              onClick={() => router.push(`/modules/${track}/self_intro?version=tech`)}
+                              className="px-3 py-1.5 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-lg text-xs font-medium transition-colors"
+                            >
+                              ⚡ 技术轮 1分钟
+                            </button>
+                            <button
+                              onClick={() => router.push(`/modules/${track}/self_intro?version=hr`)}
+                              className="px-3 py-1.5 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-lg text-xs font-medium transition-colors"
+                            >
+                              🗣️ HR轮 3-5分钟
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+
               return (
                 <button
                   key={m.module}
                   disabled={allLocked}
                   onClick={() => router.push(`/modules/${track}/${m.module}`)}
-                  className={`w-full text-left rounded-2xl p-5 transition-all duration-200 ${
-                    allLocked
-                      ? 'bg-white/40 border border-white/50 opacity-50 cursor-not-allowed'
-                      : 'bg-white/80 backdrop-blur-xl border border-pink-100 shadow-[0_4px_24px_rgba(244,114,182,0.07)] hover:shadow-[0_8px_32px_rgba(244,114,182,0.12)] hover:-translate-y-0.5'
-                  }`}
+                  className={cardBase}
                 >
                   <div className="flex items-start gap-4">
                     <div className="text-3xl shrink-0">{meta?.icon ?? '📘'}</div>

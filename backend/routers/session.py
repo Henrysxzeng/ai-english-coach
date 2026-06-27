@@ -36,6 +36,12 @@ SCENE_OPENERS = {
     "pm_product_sense": "Let's dive into a product sense question. Why don't you start by clarifying who the user is and what problem we're solving?",
     "pm_metrics_execution": "Let's talk through a metrics and execution scenario. Can you start by telling me what metrics you'd look at first?",
     "pm_estimation_strategy": "Let's work through an estimation problem together. Can you start by telling me what assumptions you'd make?",
+    "self_intro_recall": "Alright, let's see if you've got it down. Go ahead — tell me about yourself!",
+    "proj_project_debrief": "Thanks for joining! I'd love to hear about a project you were involved in. Could you walk me through your role, the scope, and the main challenges you faced?",
+    "proj_behavioral": "Welcome! Let's get started with some behavioral questions. Could you begin by telling me about yourself and what drew you to project management and IT consulting?",
+    "proj_client_comm": "Good afternoon! I'm the client for today's session. I'd like to hear how things are going with the project. Can you give me a quick status update?",
+    "proj_situational": "I want to test how you handle pressure. Here's the situation: the project is two weeks behind schedule and the client just escalated. Walk me through what you'd do.",
+    "proj_planning": "Let's talk about planning and process. Could you walk me through how you'd kick off a three-month IT consulting project from scratch?",
 }
 
 VALID_SCENES = set(SCENE_OPENERS.keys())

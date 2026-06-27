@@ -13,6 +13,75 @@ type StageStatus = 'locked' | 'in_progress' | 'completed'
 interface StageInfo { stage: string; status: StageStatus; completed_at: string | null }
 type SelfIntroDual = { tech: string; hr: string }
 
+function ScriptWithChunks({ text, onEdit }: { text: string; onEdit?: () => void }) {
+  const [playing, setPlaying] = useState<number | null>(null)
+
+  const rawChunks = text.split(/\n\n+/).filter((p) => p.trim())
+  const chunks = rawChunks.length > 1 ? rawChunks : text.split(/\n/).filter((s) => s.trim())
+
+  function speak(t: string, idx: number) {
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(t)
+    u.lang = 'en-US'
+    u.rate = 0.9
+    u.onend = () => setPlaying(null)
+    setPlaying(idx)
+    window.speechSynthesis.speak(u)
+  }
+
+  function speakWord(word: string) {
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(word)
+    u.lang = 'en-US'
+    window.speechSynthesis.speak(u)
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {chunks.map((chunk, i) => (
+        <div key={i} className="bg-rose-50/40 border border-rose-100 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <span className="shrink-0 w-5 h-5 rounded-full bg-rose-100 text-rose-500 text-xs flex items-center justify-center font-bold mt-0.5">
+              {i + 1}
+            </span>
+            <p className="text-sm text-gray-700 leading-relaxed flex-1">
+              {chunk.split(/(\s+)/).map((part, j) => {
+                const word = part.replace(/[^a-zA-Z''-]/g, '')
+                if (!word) return <span key={j}>{part}</span>
+                return (
+                  <span
+                    key={j}
+                    onClick={() => speakWord(word)}
+                    className="cursor-pointer hover:text-rose-500 hover:bg-rose-100 rounded px-0.5 transition-colors"
+                    title={`点击听 "${word}" 的发音`}
+                  >
+                    {part}
+                  </span>
+                )
+              })}
+            </p>
+          </div>
+          <div className="flex justify-end mt-1.5">
+            <button
+              onClick={() =>
+                playing === i
+                  ? (window.speechSynthesis.cancel(), setPlaying(null))
+                  : speak(chunk, i)
+              }
+              className="text-xs text-rose-400 hover:text-rose-500 flex items-center gap-1 px-2 py-1 rounded hover:bg-rose-50"
+            >
+              {playing === i ? '⏹ 停止' : '▶ 播放整段'}
+            </button>
+          </div>
+        </div>
+      ))}
+      {onEdit && (
+        <p className="text-xs text-gray-400 text-center pt-1">点击任意单词可听发音 · 点击段落右下角播放整段</p>
+      )}
+    </div>
+  )
+}
+
 const MODULE_STAGES: Record<string, string[]> = {
   self_intro: ['learn'],
   resume_deep_dive: ['learn', 'master'],
@@ -95,6 +164,17 @@ export default function ModuleStagePage() {
           .then((d) => setHasProblem(!!d))
       )
     }
+    // 自动加载已缓存的稿子（不触发 LLM 生成）
+    authHeaders().then(async (headers) => {
+      const res = await fetch(`${API_URL}/api/modules/script?track=${track}&module=${moduleName}`, { headers })
+      if (res.ok) {
+        const data = await res.json()
+        if (data && data.content) {
+          setContentType(data.content_type)
+          setScriptContent(data.content)
+        }
+      }
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track, moduleName, isSignedIn])
 
@@ -466,10 +546,11 @@ export default function ModuleStagePage() {
                         ? '技术面开场，高度概括基本信息 + 最匹配岗位的技能，1分钟内说完'
                         : 'HR轮，结合岗位JD用story-telling展开2-3段经历，不要照本宣科'}
                     </p>
-                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                      {(scriptContent as SelfIntroDual)[activeIntroVersion]}
-                    </p>
-                    <div className="flex items-center gap-4">
+                    <ScriptWithChunks
+                      text={(scriptContent as SelfIntroDual)[activeIntroVersion]}
+                      onEdit={() => { setEditContent((scriptContent as SelfIntroDual)[activeIntroVersion]); setEditMode(true) }}
+                    />
+                    <div className="flex items-center gap-4 pt-1">
                       <button
                         onClick={() => { setEditContent((scriptContent as SelfIntroDual)[activeIntroVersion]); setEditMode(true) }}
                         className="text-xs text-rose-400 hover:text-rose-500"
@@ -500,7 +581,14 @@ export default function ModuleStagePage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{scriptContent as string}</p>
+                    {moduleName === 'self_intro' ? (
+                      <ScriptWithChunks
+                        text={scriptContent as string}
+                        onEdit={() => { setEditContent(scriptContent as string); setEditMode(true) }}
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{scriptContent as string}</p>
+                    )}
                     <div className="flex items-center gap-4">
                       {moduleName === 'self_intro' && (
                         <button

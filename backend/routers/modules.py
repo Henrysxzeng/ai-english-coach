@@ -331,6 +331,24 @@ async def create_problem(request: Request, data: ModuleProblemCreate):
     return {"ok": True, "problem_id": row[0] if row else None}
 
 
+@router.get("/script")
+async def get_cached_script(request: Request, track: str, module: str):
+    """读取已缓存的稿子，不存在则返回 null（不触发 LLM 生成）。"""
+    clerk_uid = await _require_user(request)
+    _validate_track_module_stage(track, module)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await _ensure_initialized(db, clerk_uid, track)
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT content FROM study_materials WHERE clerk_user_id = ? AND track = ? AND module = ?",
+            (clerk_uid, track, module),
+        )
+        cached = await cursor.fetchone()
+    if not cached:
+        return None
+    return _format_script_response(module, cached["content"])
+
+
 @router.post("/script")
 async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
     clerk_uid = await _require_user(request)

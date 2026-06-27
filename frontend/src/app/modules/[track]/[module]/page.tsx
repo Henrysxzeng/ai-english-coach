@@ -2,7 +2,7 @@
 // 单个模块的阶段页：learn(背稿/背语料) -> apply(自选题目脱稿) -> master(AI出题/简历驱动脱稿)
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { SignInButton, useAuth } from '@clerk/nextjs'
@@ -13,8 +13,25 @@ type StageStatus = 'locked' | 'in_progress' | 'completed'
 interface StageInfo { stage: string; status: StageStatus; completed_at: string | null }
 type SelfIntroDual = { tech: string; hr: string }
 
-function ScriptWithChunks({ text, onEdit }: { text: string; onEdit?: () => void }) {
+type ChunkScore = { accuracy: number; words: Array<{ word: string; accuracy: number }> }
+
+function ScriptWithChunks({
+  text,
+  onEdit,
+  apiUrl,
+  getToken,
+}: {
+  text: string
+  onEdit?: () => void
+  apiUrl: string
+  getToken: () => Promise<string | null>
+}) {
   const [playing, setPlaying] = useState<number | null>(null)
+  const [recState, setRecState] = useState<Record<number, 'idle' | 'recording' | 'loading'>>({})
+  const [scores, setScores] = useState<Record<number, ChunkScore>>({})
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const activeIdxRef = useRef<number>(-1)
 
   const rawChunks = text.split(/\n\n+/).filter((p) => p.trim())
   const chunks = rawChunks.length > 1 ? rawChunks : text.split(/\n/).filter((s) => s.trim())
@@ -36,48 +53,134 @@ function ScriptWithChunks({ text, onEdit }: { text: string; onEdit?: () => void 
     window.speechSynthesis.speak(u)
   }
 
+  async function startRecord(idx: number) {
+    if (recorderRef.current && recState[activeIdxRef.current] === 'recording') {
+      recorderRef.current.stop()
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      audioChunksRef.current = []
+      activeIdxRef.current = idx
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setRecState((s) => ({ ...s, [idx]: 'loading' }))
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        const form = new FormData()
+        form.append('audio', blob, 'recording.webm')
+        form.append('reference_text', chunks[idx])
+        try {
+          const token = await getToken()
+          const headers: Record<string, string> = {}
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const res = await fetch(`${apiUrl}/api/shadowing-assess`, { method: 'POST', headers, body: form })
+          if (res.ok) {
+            const data = await res.json()
+            setScores((s) => ({
+              ...s,
+              [idx]: { accuracy: data?.overall?.accuracy ?? 0, words: data?.words ?? [] },
+            }))
+          }
+        } catch (_) { /* non-critical */ }
+        setRecState((s) => ({ ...s, [idx]: 'idle' }))
+      }
+      recorderRef.current = recorder
+      recorder.start()
+      setRecState((s) => ({ ...s, [idx]: 'recording' }))
+    } catch (_) {
+      alert('请允许麦克风权限后再使用跟读功能')
+    }
+  }
+
+  function stopRecord(idx: number) {
+    if (recorderRef.current && recState[idx] === 'recording') recorderRef.current.stop()
+  }
+
   return (
     <div className="space-y-2.5">
-      {chunks.map((chunk, i) => (
-        <div key={i} className="bg-rose-50/40 border border-rose-100 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <span className="shrink-0 w-5 h-5 rounded-full bg-rose-100 text-rose-500 text-xs flex items-center justify-center font-bold mt-0.5">
-              {i + 1}
-            </span>
-            <p className="text-sm text-gray-700 leading-relaxed flex-1">
-              {chunk.split(/(\s+)/).map((part, j) => {
-                const word = part.replace(/[^a-zA-Z''-]/g, '')
-                if (!word) return <span key={j}>{part}</span>
-                return (
-                  <span
-                    key={j}
-                    onClick={() => speakWord(word)}
-                    className="cursor-pointer hover:text-rose-500 hover:bg-rose-100 rounded px-0.5 transition-colors"
-                    title={`点击听 "${word}" 的发音`}
-                  >
-                    {part}
+      {chunks.map((chunk, i) => {
+        const state = recState[i] ?? 'idle'
+        const score = scores[i]
+        return (
+          <div key={i} className="bg-rose-50/40 border border-rose-100 rounded-xl p-4 space-y-2">
+            <div className="flex items-start gap-3">
+              <span className="shrink-0 w-5 h-5 rounded-full bg-rose-100 text-rose-500 text-xs flex items-center justify-center font-bold mt-0.5">
+                {i + 1}
+              </span>
+              <p className="text-sm text-gray-700 leading-relaxed flex-1">
+                {chunk.split(/(\s+)/).map((part, j) => {
+                  const word = part.replace(/[^a-zA-Z''-]/g, '')
+                  if (!word) return <span key={j}>{part}</span>
+                  return (
+                    <span
+                      key={j}
+                      onClick={() => speakWord(word)}
+                      className="cursor-pointer hover:text-rose-500 hover:bg-rose-100 rounded px-0.5 transition-colors"
+                      title={`点击听 "${word}" 的发音`}
+                    >
+                      {part}
+                    </span>
+                  )
+                })}
+              </p>
+            </div>
+
+            {/* 跟读评分结果 */}
+            {score && (
+              <div className="ml-8 p-2.5 bg-white rounded-lg border border-pink-100 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-bold ${score.accuracy >= 80 ? 'text-green-500' : score.accuracy >= 60 ? 'text-amber-500' : 'text-rose-500'}`}>
+                    {Math.round(score.accuracy)} 分
                   </span>
-                )
-              })}
-            </p>
+                  <span className="text-xs text-gray-400">发音准确度</span>
+                </div>
+                {score.words.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {score.words.map((w, j) => (
+                      <span
+                        key={j}
+                        className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                          w.accuracy >= 80
+                            ? 'text-gray-500 bg-gray-50'
+                            : w.accuracy >= 60
+                            ? 'text-amber-600 bg-amber-50'
+                            : 'text-rose-600 bg-rose-50'
+                        }`}
+                        title={`${w.word}: ${Math.round(w.accuracy)}分`}
+                      >
+                        {w.word}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 mt-0.5">
+              <button
+                onClick={() => playing === i ? (window.speechSynthesis.cancel(), setPlaying(null)) : speak(chunk, i)}
+                className="text-xs text-rose-400 hover:text-rose-500 flex items-center gap-1 px-2 py-1 rounded hover:bg-rose-50"
+              >
+                {playing === i ? '⏹ 停止' : '▶ 播放整段'}
+              </button>
+              <button
+                onClick={() => state === 'recording' ? stopRecord(i) : startRecord(i)}
+                disabled={state === 'loading'}
+                className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors disabled:opacity-50 ${
+                  state === 'recording'
+                    ? 'text-white bg-rose-400 hover:bg-rose-500 animate-pulse'
+                    : 'text-rose-400 hover:text-rose-500 hover:bg-rose-50'
+                }`}
+              >
+                {state === 'recording' ? '⏹ 停止录音' : state === 'loading' ? '评分中…' : '🎙 跟读评分'}
+              </button>
+            </div>
           </div>
-          <div className="flex justify-end mt-1.5">
-            <button
-              onClick={() =>
-                playing === i
-                  ? (window.speechSynthesis.cancel(), setPlaying(null))
-                  : speak(chunk, i)
-              }
-              className="text-xs text-rose-400 hover:text-rose-500 flex items-center gap-1 px-2 py-1 rounded hover:bg-rose-50"
-            >
-              {playing === i ? '⏹ 停止' : '▶ 播放整段'}
-            </button>
-          </div>
-        </div>
-      ))}
-      {onEdit && (
-        <p className="text-xs text-gray-400 text-center pt-1">点击任意单词可听发音 · 点击段落右下角播放整段</p>
-      )}
+        )
+      })}
+      <p className="text-xs text-gray-400 text-center pt-1">点击单词听发音 · 播放整段 · 跟读后看逐词准确度</p>
     </div>
   )
 }
@@ -551,6 +654,8 @@ export default function ModuleStagePage() {
                     <ScriptWithChunks
                       text={(scriptContent as SelfIntroDual)[activeIntroVersion]}
                       onEdit={() => { setEditContent((scriptContent as SelfIntroDual)[activeIntroVersion]); setEditMode(true) }}
+                      apiUrl={API_URL}
+                      getToken={getToken}
                     />
                     <div className="flex items-center gap-4 pt-1">
                       <button
@@ -587,6 +692,8 @@ export default function ModuleStagePage() {
                       <ScriptWithChunks
                         text={scriptContent as string}
                         onEdit={() => { setEditContent(scriptContent as string); setEditMode(true) }}
+                        apiUrl={API_URL}
+                        getToken={getToken}
                       />
                     ) : (
                       <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{scriptContent as string}</p>

@@ -15,6 +15,32 @@ type SelfIntroDual = { tech: string; hr: string }
 
 type ChunkScore = { accuracy: number; words: Array<{ word: string; accuracy: number }> }
 
+function pcmToWav(pcm: Float32Array, sampleRate: number): Blob {
+  const n = pcm.length
+  const buf = new ArrayBuffer(44 + n * 2)
+  const v = new DataView(buf)
+  const str = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)) }
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE')
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true)
+  v.setUint16(22, 1, true); v.setUint32(24, sampleRate, true)
+  v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true)
+  str(36, 'data'); v.setUint32(40, n * 2, true)
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, pcm[i]))
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
+  }
+  return new Blob([buf], { type: 'audio/wav' })
+}
+
+async function webmBlobToWav(blob: Blob): Promise<Blob> {
+  const arrayBuf = await blob.arrayBuffer()
+  const ctx = new AudioContext({ sampleRate: 16000 })
+  const decoded = await ctx.decodeAudioData(arrayBuf)
+  const wav = pcmToWav(decoded.getChannelData(0), decoded.sampleRate)
+  await ctx.close()
+  return wav
+}
+
 function ScriptWithChunks({
   text,
   onEdit,
@@ -70,14 +96,16 @@ function ScriptWithChunks({
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop())
         setRecState((s) => ({ ...s, [idx]: 'loading' }))
-        const blob = new Blob(audioChunksRef.current, { type: mimeType })
-        const form = new FormData()
-        form.append('audio', blob, 'recording.webm')
-        form.append('reference_text', chunks[idx])
+        const webmBlob = new Blob(audioChunksRef.current, { type: mimeType })
+        if (webmBlob.size < 500) { setRecState((s) => ({ ...s, [idx]: 'idle' })); return }
         try {
+          const wavBlob = await webmBlobToWav(webmBlob)
           const token = await getToken()
           const headers: Record<string, string> = {}
           if (token) headers['Authorization'] = `Bearer ${token}`
+          const form = new FormData()
+          form.append('audio', wavBlob, 'recording.wav')
+          form.append('reference_text', chunks[idx])
           const res = await fetch(`${apiUrl}/api/shadowing-assess`, { method: 'POST', headers, body: form })
           if (res.ok) {
             const data = await res.json()
@@ -90,7 +118,7 @@ function ScriptWithChunks({
         setRecState((s) => ({ ...s, [idx]: 'idle' }))
       }
       recorderRef.current = recorder
-      recorder.start()
+      recorder.start(100)
       setRecState((s) => ({ ...s, [idx]: 'recording' }))
     } catch (_) {
       alert('请允许麦克风权限后再使用跟读功能')

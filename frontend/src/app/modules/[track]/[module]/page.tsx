@@ -53,10 +53,11 @@ function ScriptWithChunks({
   getToken: () => Promise<string | null>
 }) {
   const [playing, setPlaying] = useState<number | null>(null)
-  const [recState, setRecState] = useState<Record<number, 'idle' | 'recording' | 'loading'>>({})
+  const [recState, setRecState] = useState<Record<number, 'idle' | 'recording' | 'recorded' | 'loading'>>({})
   const [scores, setScores] = useState<Record<number, ChunkScore>>({})
   const recorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const pendingBlobRef = useRef<{ idx: number; blob: Blob } | null>(null)
   const activeIdxRef = useRef<number>(-1)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -116,29 +117,12 @@ function ScriptWithChunks({
       audioChunksRef.current = []
       activeIdxRef.current = idx
       recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop())
-        setRecState((s) => ({ ...s, [idx]: 'loading' }))
         const webmBlob = new Blob(audioChunksRef.current, { type: mimeType })
         if (webmBlob.size < 500) { setRecState((s) => ({ ...s, [idx]: 'idle' })); return }
-        try {
-          const wavBlob = await webmBlobToWav(webmBlob)
-          const token = await getToken()
-          const headers: Record<string, string> = {}
-          if (token) headers['Authorization'] = `Bearer ${token}`
-          const form = new FormData()
-          form.append('audio', wavBlob, 'recording.wav')
-          form.append('reference_text', chunks[idx])
-          const res = await fetch(`${apiUrl}/api/shadowing-assess`, { method: 'POST', headers, body: form })
-          if (res.ok) {
-            const data = await res.json()
-            setScores((s) => ({
-              ...s,
-              [idx]: { accuracy: data?.overall?.accuracy ?? 0, words: data?.words ?? [] },
-            }))
-          }
-        } catch (_) { /* non-critical */ }
-        setRecState((s) => ({ ...s, [idx]: 'idle' }))
+        pendingBlobRef.current = { idx, blob: webmBlob }
+        setRecState((s) => ({ ...s, [idx]: 'recorded' }))
       }
       recorderRef.current = recorder
       recorder.start(100)
@@ -150,6 +134,36 @@ function ScriptWithChunks({
 
   function stopRecord(idx: number) {
     if (recorderRef.current && recState[idx] === 'recording') recorderRef.current.stop()
+  }
+
+  function cancelRecord(idx: number) {
+    pendingBlobRef.current = null
+    setRecState((s) => ({ ...s, [idx]: 'idle' }))
+  }
+
+  async function submitRecord(idx: number) {
+    const pending = pendingBlobRef.current
+    if (!pending || pending.idx !== idx) return
+    pendingBlobRef.current = null
+    setRecState((s) => ({ ...s, [idx]: 'loading' }))
+    try {
+      const wavBlob = await webmBlobToWav(pending.blob)
+      const token = await getToken()
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const form = new FormData()
+      form.append('audio', wavBlob, 'recording.wav')
+      form.append('reference_text', chunks[idx])
+      const res = await fetch(`${apiUrl}/api/shadowing-assess`, { method: 'POST', headers, body: form })
+      if (res.ok) {
+        const data = await res.json()
+        setScores((s) => ({
+          ...s,
+          [idx]: { accuracy: data?.overall?.accuracy ?? 0, words: data?.words ?? [] },
+        }))
+      }
+    } catch (_) { /* non-critical */ }
+    setRecState((s) => ({ ...s, [idx]: 'idle' }))
   }
 
   return (
@@ -219,17 +233,34 @@ function ScriptWithChunks({
               >
                 {playing === i ? '⏹ 停止' : '▶ 播放整段'}
               </button>
-              <button
-                onClick={() => state === 'recording' ? stopRecord(i) : startRecord(i)}
-                disabled={state === 'loading'}
-                className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors disabled:opacity-50 ${
-                  state === 'recording'
-                    ? 'text-white bg-rose-400 hover:bg-rose-500 animate-pulse'
-                    : 'text-rose-400 hover:text-rose-500 hover:bg-rose-50'
-                }`}
-              >
-                {state === 'recording' ? '⏹ 停止录音' : state === 'loading' ? '评分中…' : '🎙 跟读评分'}
-              </button>
+              {state === 'recorded' ? (
+                <>
+                  <button
+                    onClick={() => cancelRecord(i)}
+                    className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-50 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={() => submitRecord(i)}
+                    className="text-xs text-white bg-rose-400 hover:bg-rose-500 px-3 py-1 rounded transition-colors"
+                  >
+                    提交评分
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => state === 'recording' ? stopRecord(i) : startRecord(i)}
+                  disabled={state === 'loading'}
+                  className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors disabled:opacity-50 ${
+                    state === 'recording'
+                      ? 'text-white bg-rose-400 hover:bg-rose-500 animate-pulse'
+                      : 'text-rose-400 hover:text-rose-500 hover:bg-rose-50'
+                  }`}
+                >
+                  {state === 'recording' ? '⏹ 停止录音' : state === 'loading' ? '评分中…' : '🎙 跟读评分'}
+                </button>
+              )}
             </div>
           </div>
         )

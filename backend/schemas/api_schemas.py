@@ -63,6 +63,7 @@ class ModuleScriptSave(BaseModel):
     track: str
     module: str
     content: str
+    version: str = "tech"  # "tech" | "hr" for self_intro dual versions
 
 
 class MessageResponse(BaseModel):

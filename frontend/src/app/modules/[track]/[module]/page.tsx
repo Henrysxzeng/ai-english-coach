@@ -11,6 +11,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 type StageStatus = 'locked' | 'in_progress' | 'completed'
 interface StageInfo { stage: string; status: StageStatus; completed_at: string | null }
+type SelfIntroDual = { tech: string; hr: string }
 
 const MODULE_STAGES: Record<string, string[]> = {
   self_intro: ['learn'],
@@ -44,7 +45,8 @@ export default function ModuleStagePage() {
   const [stageInfos, setStageInfos] = useState<StageInfo[] | null>(null)
   const [selectedStage, setSelectedStage] = useState<string>('')
   const [profile, setProfile] = useState({ resume_text: '', jd_text: '' })
-  const [scriptContent, setScriptContent] = useState<string | Array<{ question: string; suggested_answer: string }> | null>(null)
+  const [scriptContent, setScriptContent] = useState<string | Array<{ question: string; suggested_answer: string }> | SelfIntroDual | null>(null)
+  const [activeIntroVersion, setActiveIntroVersion] = useState<'tech' | 'hr'>('tech')
   const [contentType, setContentType] = useState<string>('')
   const [scriptLoading, setScriptLoading] = useState(false)
   const [advancing, setAdvancing] = useState(false)
@@ -212,13 +214,19 @@ export default function ModuleStagePage() {
     setError('')
     try {
       const headers = await authHeaders()
+      const body: Record<string, string> = { track, module: moduleName, content: editContent }
+      if (contentType === 'self_intro_dual') body.version = activeIntroVersion
       const res = await fetch(`${API_URL}/api/modules/script`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ track, module: moduleName, content: editContent }),
+        body: JSON.stringify(body),
       })
       if (res.ok) {
-        setScriptContent(editContent)
+        if (contentType === 'self_intro_dual') {
+          setScriptContent({ ...(scriptContent as SelfIntroDual), [activeIntroVersion]: editContent })
+        } else {
+          setScriptContent(editContent)
+        }
         setEditMode(false)
       } else {
         setError('保存失败，请重试')
@@ -229,7 +237,10 @@ export default function ModuleStagePage() {
   }
 
   async function startRecall() {
-    if (!scriptContent || typeof scriptContent !== 'string') return
+    const script = contentType === 'self_intro_dual'
+      ? (scriptContent as SelfIntroDual)[activeIntroVersion]
+      : scriptContent as string
+    if (!script) return
     setStartingRecall(true)
     setError('')
     try {
@@ -241,10 +252,13 @@ export default function ModuleStagePage() {
         resumeContext = p.resume_text ?? ''
         jdContext = p.jd_text ?? ''
       }
+      const versionLabel = contentType === 'self_intro_dual'
+        ? (activeIntroVersion === 'tech' ? ' (1-minute technical version)' : ' (3-5 minute HR version)')
+        : ''
       const res = await fetch(`${API_URL}/api/session/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scene: 'self_intro_recall', resume_context: resumeContext, jd_context: jdContext, problem_context: scriptContent }),
+        body: JSON.stringify({ scene: 'self_intro_recall', resume_context: resumeContext, jd_context: jdContext, problem_context: `[Saved Script${versionLabel}]\n${script}` }),
       })
       if (!res.ok) { setError('创建练习会话失败'); return }
       const data = await res.json()
@@ -383,6 +397,11 @@ export default function ModuleStagePage() {
               <div className="bg-white/80 backdrop-blur-xl border border-pink-100 rounded-2xl p-6 shadow-[0_4px_24px_rgba(244,114,182,0.07)] space-y-4">
                 {editMode ? (
                   <div className="space-y-3">
+                    {contentType === 'self_intro_dual' && (
+                      <p className="text-xs text-rose-400 font-medium">
+                        正在编辑：{activeIntroVersion === 'tech' ? '⚡ 1分钟技术轮版本' : '🗣️ 3-5分钟HR轮版本'}
+                      </p>
+                    )}
                     <p className="text-xs text-gray-400">自由编辑稿子内容，保存后会替换 AI 生成版本</p>
                     <textarea
                       value={editContent}
@@ -424,6 +443,50 @@ export default function ModuleStagePage() {
                     >
                       {scriptLoading ? '生成中…' : '✨ 生成稿子'}
                     </button>
+                  </div>
+                ) : contentType === 'self_intro_dual' ? (
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      {(['tech', 'hr'] as const).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setActiveIntroVersion(v)}
+                          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                            activeIntroVersion === v
+                              ? 'bg-gradient-to-r from-rose-400 to-pink-500 text-white'
+                              : 'bg-white border border-pink-100 text-gray-500 hover:border-rose-200'
+                          }`}
+                        >
+                          {v === 'tech' ? '⚡ 1分钟 · 技术轮' : '🗣️ 3-5分钟 · HR轮'}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {activeIntroVersion === 'tech'
+                        ? '技术面开场，高度概括基本信息 + 最匹配岗位的技能，1分钟内说完'
+                        : 'HR轮，结合岗位JD用story-telling展开2-3段经历，不要照本宣科'}
+                    </p>
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                      {(scriptContent as SelfIntroDual)[activeIntroVersion]}
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={() => { setEditContent((scriptContent as SelfIntroDual)[activeIntroVersion]); setEditMode(true) }}
+                        className="text-xs text-rose-400 hover:text-rose-500"
+                      >
+                        ✏️ 编辑稿子
+                      </button>
+                      <button onClick={() => generateScript(true)} className="text-xs text-rose-400 hover:text-rose-500">🔄 重新生成两份</button>
+                    </div>
+                    <div className="border-t border-pink-100 pt-3">
+                      <button
+                        onClick={startRecall}
+                        disabled={startingRecall}
+                        className="w-full px-5 py-2.5 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-xl text-sm font-medium disabled:opacity-50"
+                      >
+                        {startingRecall ? '准备中…' : '🙈 盲背练习 — 遮住稿子，AI帮你对照评分'}
+                      </button>
+                    </div>
                   </div>
                 ) : contentType === 'corpus' ? (
                   <div className="space-y-3">

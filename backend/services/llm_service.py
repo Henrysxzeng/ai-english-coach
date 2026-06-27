@@ -857,33 +857,73 @@ async def generate_interview_feedback(
 ROLE_LABEL = {"sde": "software engineer", "ds": "data scientist", "pm": "product manager", "proj": "project manager"}
 
 
-async def generate_self_intro_script(resume_text: str = "", track: str = "sde") -> str:
-    """生成一份可背诵的自我介绍稿（自我介绍模块 learn 阶段用）。"""
+async def generate_self_intro_script(resume_text: str = "", track: str = "sde") -> dict[str, str]:
+    """生成技术轮（1分钟）和 HR 轮（3-5分钟）两版自我介绍稿，并行生成。"""
     role = ROLE_LABEL.get(track, "software engineer")
-    prompt = (
-        f"Write a natural, spoken-style self-introduction script (60-90 seconds when read aloud, "
-        f"~150-180 words) for a {role} candidate to memorize for English interviews. "
-        + (f"Base it on this resume: {resume_text}" if resume_text else
-           "No resume was provided — write a solid generic template the candidate can personalize.")
-        + " Structure: who you are + background (1-2 sentences) -> most relevant experience/projects "
-        "(2-3 sentences with specifics) -> what you're looking for / why this kind of role (1 sentence). "
-        "Sound like natural spoken English, not a written bio — use contractions, vary sentence length. "
-        "Output ONLY the script text, no labels or markdown."
+    resume_note = f"Base it on this resume:\n{resume_text}" if resume_text else "No resume provided — write a solid generic template the candidate can personalize."
+
+    tech_prompt = (
+        f"Write a 1-minute spoken self-introduction (~130-150 words) for a {role} candidate "
+        "to use at the START of a TECHNICAL interview round. "
+        "Guidelines: open with name + current status (degree/school/major) in one sentence; "
+        "mention your core tech stack and hard skills briefly; "
+        "highlight 1-2 projects or internship highlights that directly match the role's requirements — "
+        "pick the most relevant ones, not everything on the resume; "
+        "close with one sentence on why you're interested in this type of role. "
+        "Keep it tight and high-level — the interviewer just needs quick context before diving into technical questions. "
+        "Natural spoken English, contractions OK, no bullet points or headers. "
+        f"{resume_note} Output ONLY the script, no extra commentary."
     )
+
+    hr_prompt = (
+        f"Write a 3-5 minute spoken self-introduction (~480-600 words) for a {role} candidate "
+        "to use in an HR or first-round screening interview. "
+        "Guidelines: open with name, school, degree, and briefly what drew you to this field; "
+        "walk through 2-3 key experiences using brief story-telling mode (situation → what you did → outcome) — "
+        "focus on experiences that match the role's JD requirements, NOT just a chronological resume recitation; "
+        "highlight both hard skills (technical stack, tools) and soft skills (teamwork, communication, ownership); "
+        "show genuine motivation: why this type of company or role, not a generic line; "
+        "close with a forward-looking statement — what you hope to contribute or learn. "
+        "Natural spoken English, flowing paragraphs, no bullet points or headers. "
+        f"{resume_note} Output ONLY the script, no extra commentary."
+    )
+
+    tech_fallback = (
+        f"Hi, I'm [Your Name], currently finishing my [degree] in [major] at [school]. "
+        f"My core skills are in [tech stack]. "
+        "Most recently I built [a project] where I [specific contribution], which [measurable result]. "
+        "I'm excited about this role because [one-sentence reason]."
+    )
+    hr_fallback = (
+        f"Hi, I'm [Your Name]. I'm currently a [degree] student at [school], studying [major]. "
+        "I got into [field] because [genuine reason]. "
+        "During my internship at [Company], I worked on [project]: [what you did and outcome]. "
+        "I also led [another experience] where [story]. "
+        "Beyond the technical side, I've learned [soft skill] from [experience]. "
+        "I'm drawn to this role because [specific reason matching JD]. "
+        "Looking ahead, I'm excited to [what you want to contribute or learn here]."
+    )
+
     try:
-        response = await client.chat.completions.create(
+        tech_task = client.chat.completions.create(
             model="deepseek-chat",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=400,
+            messages=[{"role": "user", "content": tech_prompt}],
+            max_tokens=350,
             temperature=0.6,
         )
-        return response.choices[0].message.content.strip()
-    except Exception:
-        return (
-            f"Hi, I'm [Your Name], a {role} with a background in [your domain]. "
-            "Most recently, I worked on [a project] where I [your specific contribution and a measurable result]. "
-            "I'm looking for a role where I can [what you're looking for next]."
+        hr_task = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": hr_prompt}],
+            max_tokens=900,
+            temperature=0.6,
         )
+        tech_res, hr_res = await asyncio.gather(tech_task, hr_task)
+        return {
+            "tech": tech_res.choices[0].message.content.strip(),
+            "hr": hr_res.choices[0].message.content.strip(),
+        }
+    except Exception:
+        return {"tech": tech_fallback, "hr": hr_fallback}
 
 
 async def generate_resume_corpus(resume_text: str = "", track: str = "sde") -> list[dict]:

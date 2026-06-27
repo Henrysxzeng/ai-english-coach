@@ -367,7 +367,8 @@ async def get_or_generate_script(request: Request, data: ModuleScriptRequest):
         corpus = await generate_behavioral_corpus(data.track)
         content_str = json.dumps(corpus, ensure_ascii=False)
     elif data.module == "self_intro":
-        content_str = await generate_self_intro_script(resume_text, data.track)
+        scripts = await generate_self_intro_script(resume_text, data.track)
+        content_str = json.dumps(scripts, ensure_ascii=False)
     elif data.module == "resume_deep_dive":
         corpus = await generate_resume_corpus(resume_text, data.track)
         content_str = json.dumps(corpus, ensure_ascii=False)
@@ -410,20 +411,44 @@ async def save_edited_script(request: Request, data: ModuleScriptSave):
         raise HTTPException(status_code=400, detail="Only self_intro scripts can be manually edited")
     if not data.content.strip():
         raise HTTPException(status_code=400, detail="content cannot be empty")
+    if data.version not in ("tech", "hr"):
+        raise HTTPException(status_code=400, detail="version must be 'tech' or 'hr'")
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT content FROM study_materials WHERE clerk_user_id = ? AND track = ? AND module = ?",
+            (clerk_uid, data.track, data.module),
+        )
+        row = await cursor.fetchone()
+        try:
+            existing = json.loads(row["content"]) if row else {}
+            if not isinstance(existing, dict):
+                existing = {"tech": existing, "hr": ""}
+        except Exception:
+            existing = {}
+        existing[data.version] = data.content.strip()
+        new_content = json.dumps(existing, ensure_ascii=False)
         await db.execute(
             """INSERT INTO study_materials (clerk_user_id, track, module, content, created_at)
                VALUES (?, ?, ?, ?, ?)
                ON CONFLICT (clerk_user_id, track, module) DO UPDATE SET
                    content = excluded.content, created_at = excluded.created_at""",
-            (clerk_uid, data.track, data.module, data.content.strip(), now),
+            (clerk_uid, data.track, data.module, new_content, now),
         )
         await db.commit()
     return {"ok": True}
 
 
 def _format_script_response(module: str, content_str: str):
+    if module == "self_intro":
+        try:
+            parsed = json.loads(content_str)
+            if isinstance(parsed, dict) and ("tech" in parsed or "hr" in parsed):
+                return {"module": module, "content_type": "self_intro_dual", "content": parsed}
+        except Exception:
+            pass
+        return {"module": module, "content_type": "script", "content": content_str}
     if module in ("resume_deep_dive", "behavioral"):
         try:
             return {"module": module, "content_type": "corpus", "content": json.loads(content_str)}

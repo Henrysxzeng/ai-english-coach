@@ -34,7 +34,10 @@ function ScriptWithChunks({
   const activeIdxRef = useRef<number>(-1)
 
   const rawChunks = text.split(/\n\n+/).filter((p) => p.trim())
-  const chunks = rawChunks.length > 1 ? rawChunks : text.split(/\n/).filter((s) => s.trim())
+  const lineChunks = text.split(/\n/).filter((s) => s.trim())
+  // fallback: split by sentence boundary if there are no paragraph/line breaks
+  const sentenceChunks = text.match(/[^.!?]+[.!?]+(?:\s|$)/g)?.map((s) => s.trim()).filter(Boolean) ?? [text]
+  const chunks = rawChunks.length > 1 ? rawChunks : lineChunks.length > 1 ? lineChunks : sentenceChunks
 
   function speak(t: string, idx: number) {
     window.speechSynthesis.cancel()

@@ -873,6 +873,7 @@ async def generate_self_intro_script(resume_text: str = "", track: str = "sde", 
         "close with one sentence on why you're interested in this type of role. "
         "Keep it tight and high-level — the interviewer just needs quick context before diving into technical questions. "
         "Natural spoken English, contractions OK, no bullet points or headers. "
+        "Separate each paragraph with a blank line (double newline). "
         f"{resume_note}{user_note_suffix} Output ONLY the script, no extra commentary."
     )
 
@@ -886,6 +887,7 @@ async def generate_self_intro_script(resume_text: str = "", track: str = "sde", 
         "show genuine motivation: why this type of company or role, not a generic line; "
         "close with a forward-looking statement — what you hope to contribute or learn. "
         "Natural spoken English, flowing paragraphs, no bullet points or headers. "
+        "Separate each paragraph with a blank line (double newline). "
         f"{resume_note}{user_note_suffix} Output ONLY the script, no extra commentary."
     )
 
@@ -1022,7 +1024,7 @@ async def generate_explanation_script(track: str, module: str, problem_text: str
         "- explains the approach step by step\n"
         "- ends with complexity/trade-offs or how they'd validate the result\n"
         f"Sound like natural spoken English (contractions, thinking-out-loud phrasing like 'so my first "
-        f"thought is...'), not a written essay.{user_note_suffix} Output ONLY the script text."
+        f"thought is...'), not a written essay. Separate each logical step with a blank line.{user_note_suffix} Output ONLY the script text."
     )
     try:
         response = await client.chat.completions.create(

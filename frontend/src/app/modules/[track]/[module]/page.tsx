@@ -58,6 +58,7 @@ function ScriptWithChunks({
   const recorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const activeIdxRef = useRef<number>(-1)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const rawChunks = text.split(/\n\n+/).filter((p) => p.trim())
   const lineChunks = text.split(/\n/).filter((s) => s.trim())
@@ -65,21 +66,43 @@ function ScriptWithChunks({
   const sentenceChunks = text.match(/[^.!?]+[.!?]+(?:\s|$)/g)?.map((s) => s.trim()).filter(Boolean) ?? [text]
   const chunks = rawChunks.length > 1 ? rawChunks : lineChunks.length > 1 ? lineChunks : sentenceChunks
 
-  function speak(t: string, idx: number) {
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(t)
-    u.lang = 'en-US'
-    u.rate = 0.9
-    u.onend = () => setPlaying(null)
-    setPlaying(idx)
-    window.speechSynthesis.speak(u)
+  function stopAudio() {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setPlaying(null)
   }
 
-  function speakWord(word: string) {
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(word)
-    u.lang = 'en-US'
-    window.speechSynthesis.speak(u)
+  async function speak(t: string, idx: number) {
+    stopAudio()
+    setPlaying(idx)
+    try {
+      const res = await fetch(`${apiUrl}/api/tts?text=${encodeURIComponent(t.slice(0, 1000))}`)
+      if (!res.ok) { setPlaying(null); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null; setPlaying(null) }
+      audio.onerror = () => { URL.revokeObjectURL(url); audioRef.current = null; setPlaying(null) }
+      audio.play()
+    } catch { setPlaying(null) }
+  }
+
+  async function speakWord(word: string) {
+    stopAudio()
+    try {
+      const res = await fetch(`${apiUrl}/api/tts?text=${encodeURIComponent(word)}`)
+      if (!res.ok) return
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null }
+      audio.onerror = () => { URL.revokeObjectURL(url); audioRef.current = null }
+      audio.play()
+    } catch { /* ignore */ }
   }
 
   async function startRecord(idx: number) {
@@ -191,7 +214,7 @@ function ScriptWithChunks({
 
             <div className="flex justify-end gap-2 mt-0.5">
               <button
-                onClick={() => playing === i ? (window.speechSynthesis.cancel(), setPlaying(null)) : speak(chunk, i)}
+                onClick={() => playing === i ? stopAudio() : speak(chunk, i)}
                 className="text-xs text-rose-400 hover:text-rose-500 flex items-center gap-1 px-2 py-1 rounded hover:bg-rose-50"
               >
                 {playing === i ? '⏹ 停止' : '▶ 播放整段'}

@@ -24,12 +24,12 @@ const PROBLEM_BACKED = new Set(['technical_explain', 'system_design', 'debug'])
 const NEEDS_PROFILE = new Set(['self_intro', 'resume_deep_dive'])
 
 const MODULE_META: Record<string, { icon: string; title: Record<string, string> }> = {
-  self_intro: { icon: '🙋', title: { sde: '自我介绍', ds: '自我介绍', pm: '自我介绍' } },
-  resume_deep_dive: { icon: '📄', title: { sde: '简历深挖', ds: '简历深挖', pm: '产品复盘' } },
-  behavioral: { icon: '🗣️', title: { sde: '行为面试 (STAR)', ds: '行为面试 (STAR)', pm: '行为面试 (STAR)' } },
-  technical_explain: { icon: '🧩', title: { sde: '算法讲解', ds: 'SQL讲解', pm: 'Product Sense' } },
-  system_design: { icon: '🏗️', title: { sde: '系统设计', ds: '实验设计', pm: '指标与执行' } },
-  debug: { icon: '🐛', title: { sde: 'Debug', ds: 'Debug', pm: '估算与排序' } },
+  self_intro: { icon: '🙋', title: { sde: '自我介绍', ds: '自我介绍', pm: '自我介绍', proj: '自我介绍' } },
+  resume_deep_dive: { icon: '📄', title: { sde: '简历深挖', ds: '简历深挖', pm: '产品复盘', proj: '项目经历深挖' } },
+  behavioral: { icon: '🗣️', title: { sde: '行为面试 (STAR)', ds: '行为面试 (STAR)', pm: '行为面试 (STAR)', proj: '行为面试 (STAR)' } },
+  technical_explain: { icon: '🧩', title: { sde: '算法讲解', ds: 'SQL讲解', pm: 'Product Sense', proj: '客户沟通' } },
+  system_design: { icon: '🏗️', title: { sde: '系统设计', ds: '实验设计', pm: '指标与执行', proj: '情景危机' } },
+  debug: { icon: '🐛', title: { sde: 'Debug', ds: 'Debug', pm: '估算与排序', proj: '规划与敏捷' } },
 }
 
 export default function ModuleStagePage() {

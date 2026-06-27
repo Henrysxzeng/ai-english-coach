@@ -25,7 +25,7 @@ from services.llm_service import (
 
 router = APIRouter(prefix="/api/modules", tags=["modules"])
 
-TRACKS = ("sde", "ds", "pm")
+TRACKS = ("sde", "ds", "pm", "proj")
 
 MODULE_ORDER = ["self_intro", "resume_deep_dive", "behavioral", "technical_explain", "system_design", "debug"]
 
@@ -67,6 +67,14 @@ MODULE_SCENE_MAP = {
     ("pm", "system_design", "master"): "pm_metrics_execution",
     ("pm", "debug", "apply"): "pm_estimation_strategy",
     ("pm", "debug", "master"): "pm_estimation_strategy",
+    ("proj", "resume_deep_dive", "master"): "proj_project_debrief",
+    ("proj", "behavioral", "master"): "proj_behavioral",
+    ("proj", "technical_explain", "apply"): "proj_client_comm",
+    ("proj", "technical_explain", "master"): "proj_client_comm",
+    ("proj", "system_design", "apply"): "proj_situational",
+    ("proj", "system_design", "master"): "proj_situational",
+    ("proj", "debug", "apply"): "proj_planning",
+    ("proj", "debug", "master"): "proj_planning",
 }
 
 

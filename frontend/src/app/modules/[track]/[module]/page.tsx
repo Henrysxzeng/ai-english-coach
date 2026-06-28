@@ -194,7 +194,7 @@ function ScriptWithChunks({
   }
 
   return (
-    <div className="space-y-2.5" onClick={(e) => { if (!(e.target as HTMLElement).closest('[data-popup]')) setSelectionPopup(null) }}>
+    <div className="space-y-2.5" onClick={(e) => { if (!(e.target as HTMLElement).closest('[data-popup]') && !window.getSelection()?.toString().trim()) setSelectionPopup(null) }}>
       {/* 选中查词义浮层 */}
       {selectionPopup && (
         <div
@@ -237,9 +237,9 @@ function ScriptWithChunks({
                   return (
                     <span
                       key={j}
-                      onClick={() => speakWord(word)}
+                      onClick={() => { if (!window.getSelection()?.toString().trim()) speakWord(word) }}
                       className="cursor-pointer hover:text-rose-500 hover:bg-rose-100 rounded px-0.5 transition-colors"
-                      title={`点击听发音 · 拖选多词可查词义`}
+                      title="点击听发音 · 拖选多词可查词义"
                     >
                       {part}
                     </span>

@@ -202,7 +202,7 @@ function ScriptWithChunks({
           style={{ position: 'fixed', left: selectionPopup.x, top: selectionPopup.y, transform: 'translate(-50%, -100%)', zIndex: 50 }}
           className="bg-white border border-rose-100 rounded-xl shadow-lg p-3 min-w-[200px] max-w-[300px]"
         >
-          <p className="text-xs font-semibold text-rose-500 mb-1.5">"{selectionPopup.text}"</p>
+          <p className="text-xs font-semibold text-rose-500 mb-1.5">&ldquo;{selectionPopup.text}&rdquo;</p>
           {!explanation && !explainLoading && (
             <button
               onClick={fetchExplanation}

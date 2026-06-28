@@ -60,6 +60,9 @@ function ScriptWithChunks({
   const pendingBlobRef = useRef<{ idx: number; blob: Blob } | null>(null)
   const activeIdxRef = useRef<number>(-1)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [selectionPopup, setSelectionPopup] = useState<{ text: string; context: string; x: number; y: number } | null>(null)
+  const [explanation, setExplanation] = useState<string | null>(null)
+  const [explainLoading, setExplainLoading] = useState(false)
 
   const rawChunks = text.split(/\n\n+/).filter((p) => p.trim())
   const lineChunks = text.split(/\n/).filter((s) => s.trim())
@@ -136,6 +139,30 @@ function ScriptWithChunks({
     if (recorderRef.current && recState[idx] === 'recording') recorderRef.current.stop()
   }
 
+  function handleMouseUp(context: string) {
+    const sel = window.getSelection()
+    const selected = sel?.toString().trim() ?? ''
+    if (!selected || selected.length < 2) { setSelectionPopup(null); return }
+    const range = sel!.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+    setSelectionPopup({ text: selected, context, x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 8 })
+    setExplanation(null)
+  }
+
+  async function fetchExplanation() {
+    if (!selectionPopup || explainLoading) return
+    setExplainLoading(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/explain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: selectionPopup.text, context: selectionPopup.context }),
+      })
+      if (res.ok) setExplanation((await res.json()).explanation)
+    } catch { /* ignore */ }
+    setExplainLoading(false)
+  }
+
   function cancelRecord(idx: number) {
     pendingBlobRef.current = null
     setRecState((s) => ({ ...s, [idx]: 'idle' }))
@@ -167,7 +194,30 @@ function ScriptWithChunks({
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2.5" onClick={(e) => { if (!(e.target as HTMLElement).closest('[data-popup]')) setSelectionPopup(null) }}>
+      {/* 选中查词义浮层 */}
+      {selectionPopup && (
+        <div
+          data-popup="true"
+          style={{ position: 'fixed', left: selectionPopup.x, top: selectionPopup.y, transform: 'translate(-50%, -100%)', zIndex: 50 }}
+          className="bg-white border border-rose-100 rounded-xl shadow-lg p-3 min-w-[200px] max-w-[300px]"
+        >
+          <p className="text-xs font-semibold text-rose-500 mb-1.5">"{selectionPopup.text}"</p>
+          {!explanation && !explainLoading && (
+            <button
+              onClick={fetchExplanation}
+              className="w-full text-xs py-1 px-3 bg-gradient-to-r from-rose-400 to-pink-500 text-white rounded-lg"
+            >
+              查词义 / 查句意
+            </button>
+          )}
+          {explainLoading && <p className="text-xs text-gray-400 text-center py-1">查询中…</p>}
+          {explanation && (
+            <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{explanation}</p>
+          )}
+        </div>
+      )}
+
       {chunks.map((chunk, i) => {
         const state = recState[i] ?? 'idle'
         const score = scores[i]
@@ -177,7 +227,10 @@ function ScriptWithChunks({
               <span className="shrink-0 w-5 h-5 rounded-full bg-rose-100 text-rose-500 text-xs flex items-center justify-center font-bold mt-0.5">
                 {i + 1}
               </span>
-              <p className="text-sm text-gray-700 leading-relaxed flex-1">
+              <p
+                className="text-sm text-gray-700 leading-relaxed flex-1 select-text"
+                onMouseUp={() => handleMouseUp(chunk)}
+              >
                 {chunk.split(/(\s+)/).map((part, j) => {
                   const word = part.replace(/[^a-zA-Z''-]/g, '')
                   if (!word) return <span key={j}>{part}</span>
@@ -186,7 +239,7 @@ function ScriptWithChunks({
                       key={j}
                       onClick={() => speakWord(word)}
                       className="cursor-pointer hover:text-rose-500 hover:bg-rose-100 rounded px-0.5 transition-colors"
-                      title={`点击听 "${word}" 的发音`}
+                      title={`点击听发音 · 拖选多词可查词义`}
                     >
                       {part}
                     </span>
